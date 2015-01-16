@@ -1,0 +1,57 @@
+\ dynamic-sized zero-ended strings table
+
+0x200 CONSTANT CHUNK \ min memory block to allocate
+
+0 \ string table header
+    CELL -- sth_memory
+    CELL -- sth_length
+    CELL -- sth_chunks
+CONSTANT /sth \ header length
+
+: STRING_TABLE ( -- ) \ create string table
+    CREATE
+        CHUNK ALLOCATE THROW DUP , \ address of 1st chunk
+        1 , \ length
+        1 , \ chunks
+        0 SWAP C! \ fist char is '0'
+    DOES>
+;
+
+: STH_LENGTH ( table -- length ) \ get table length
+    sth_length @
+;
+
+: ADD_CHUNK ( table -- )    \ allocate new chunk
+    DUP >R sth_memory @ ( addr )
+    R@ sth_chunks @ 1+ DUP >R ( addr new_chunks )
+    CHUNK * RESIZE THROW ( new_addr )
+    R> R@ sth_chunks ! \ store new chunks number
+    R> sth_memory ! \ store new address
+;
+
+: NEXT_ADDR ( table -- addr )   \ address to store new string
+    DUP STH_LENGTH SWAP sth_memory @ +
+;
+
+: ADD_STRING ( a u table -- )   \ add string to table
+    DUP >R
+    STH_LENGTH OVER + 1+ ( a u newlen )
+    DUP R@ sth_chunks @ CHUNK * > IF R@ ADD_CHUNK THEN ( a u newlen )
+    -ROT ( newlen a u )
+    R@ NEXT_ADDR SWAP 1+ CMOVE ( newlen )
+    R> sth_length !
+;
+
+: ADD_INDEX ( a u table -- index ) \ add string and get it's index
+    DUP STH_LENGTH >R
+    ADD_STRING R>
+;
+
+: FIND_STRING ( a u table -- addr | -1 - not found )
+    >R 0 -ROT ( index a u )
+    R@ sth_memory @ 1+ R@ STH_LENGTH OVER + SWAP ?DO ( index a u )
+        2DUP I ASCIIZ> COMPARE 0= IF ROT DROP I -ROT LEAVE THEN
+        I ASCIIZ> NIP 1+
+    +LOOP 2DROP RDROP
+;
+

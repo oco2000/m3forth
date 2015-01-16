@@ -1,0 +1,7 @@
+*.geany
+*.DBK
+*.elf
+*.bin
+*.debug
+*.info
+*.lst

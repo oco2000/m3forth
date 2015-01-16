@@ -1,0 +1,31 @@
+\ 128k Flash
+\   8k RAM
+
+HOST stm32vldiscovery CONSTANT DEVICE
+
+\ define memory layout
+
+INTERPRETER HEX
+00000000 0001FFFF CDATA SECTION FLASH
+20000000 200000FF IDATA SECTION IRAM
+20000100 20001EFF UDATA SECTION URAM
+FLASH IRAM URAM
+
+\ init debug info
+TARGET CDATA CURRENT-SECTION-START HOST DUP TADDR>ADDR FILENAME COUNT DWARF_INIT
+
+\ where to put the stacks?
+TARGET
+20002000  EQU RSTACK-BOTTOM
+20001F00  EQU STACK-BOTTOM
+HOST 20000000 FF +  TO  'RAMBASE
+
+\ cortex-m3 common interrupts
+HOST S" devices/int_cm3.spf" INCLUDED
+\ Device interrupts
+HOST S" devices/int_stm32f100x.spf" INCLUDED
+\ and registers
+HOST S" devices/reg_stm32f10x.spf" INCLUDED
+\ cortex-m3 common registers
+HOST S" devices/reg_cm3.spf" INCLUDED
+

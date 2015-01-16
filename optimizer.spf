@@ -1,0 +1,305 @@
+\ Optimizer
+
+HOST
+
+\ optimizing queue
+\ holds only last #optSize elements
+
+0
+    CELL -- cfa     \ cfa of compiled word, 0 if literal
+    CELL -- lit     \ value of the literal
+    CELL -- lit?    \ true if literal
+    CELL -- address \ target address where the word was compiled
+CONSTANT /opt
+
+16 CONSTANT #optSize \ queue size, must be power of 2
+#optSize 1- CONSTANT optMask
+
+CREATE optQueue   #optSize /opt * ALLOT
+0 VALUE qHead \ head pointer (index)
+0 VALUE qTail \ tail pointer (index)
+FALSE VALUE -ENQUEUE?    \ true if not to enqueue current word to optimizer queue
+
+: NEW ( -- ) \ init queue
+    0 TO qHead
+    0 TO qTail
+    FALSE TO -ENQUEUE?
+;
+
+: Nth ( n -- addr ) \ get n-th element from head
+    qHead SWAP - optMask AND
+    /opt * optQueue +
+;
+
+: HEAD ( -- addr ) \ get head of the queue
+    0 Nth ;
+
+: pointerNext ( n -- next ) \ move queue pointer to the next element
+    1+ optMask AND
+;
+
+: pointerPrev ( n -- prev ) \ move queue pointer to the next element
+    1- optMask AND
+;
+
+: qSize ( -- n ) \ get size of the queue ( 0 .. qSize-1 )
+    qHead qTail - optMask AND
+;
+
+: >OPT ( -- ) \ place new empty element on the top of the queue
+    qHead pointerNext DUP TO qHead
+    qTail = IF qTail pointerNext TO qTail THEN
+;
+
+: OPT> ( -- ) \ remove top element from the queue
+    qSize 0> IF
+        qHead pointerPrev TO qHead
+    THEN
+;
+
+: qCLEAR ( n -- ) \ remove n element from the queue
+    0 ?DO OPT> LOOP
+;
+
+: cfaOptFill ( there cfa -- ) \ fill top element with values for compiled word
+    HEAD DUP >R    cfa !
+    0           R@ lit !
+    FALSE       R@ lit? !
+                R> address !
+;
+
+: litOptFill ( lit -- ) \ fill top element with values for compiled literal
+    0 HEAD DUP >R  cfa !
+                R@ lit !
+    TRUE        R@ lit? !
+    CDATA-THERE R> address !
+;
+
+: EXECUTE>OPT ( cfa -- ) \ execute word, put it in the queue if 'there' was modified
+    FALSE TO -ENQUEUE?
+    DUP >R CDATA-THERE >R EXECUTE
+    R@ CDATA-THERE <> IF \ pointer moved
+        -ENQUEUE? IF  \ do nothing if this word compiled a literal
+            2R> 2DROP
+        ELSE
+            >OPT R> R> cfaOptFill
+        THEN
+        FALSE TO -ENQUEUE?
+    ELSE 2R> 2DROP THEN \ not moved
+;
+
+: CFA>OPT ( cfa -- ) \ put element on the top of the queue
+    CDATA-THERE SWAP >OPT cfaOptFill
+;
+
+: LIT>OPT ( n -- ) \ put literal on the top of the queue
+    >OPT litOptFill
+;
+
+: DLIT>OPT ( d -- ) \ put double literal on the top of the queue
+    SWAP LIT>OPT LIT>OPT
+;
+
+: .QUEUE ( -- ) \ print the queue
+    CR
+    CDATA-THERE U.H
+    qSize 0<> IF
+        0 qSize DUP . ." - " 1- DO
+            I Nth DUP lit? @ IF
+                lit @ ." lit: "
+            ELSE
+                cfa @
+            THEN   U.H
+        -1 +LOOP
+    THEN
+;
+
+\ ===================================== rules table ========================================
+\ rule structure
+\ link  count   word#1    word#2    ...     word#x    with    target?     assemble
+\ ^ rule address
+\ words are target words or LIT for literal
+
+0
+    CELL -- link        \ address of previous rule
+    CELL -- count       \ # of words in the rule
+    CELL -- elements    \ address of 1st word
+DROP
+
+: with ( rule -- opt_with_addr )    \ address of cfa of the word to execute the rule ( WITH )
+    DUP elements   SWAP count @ CELLS +
+;
+
+: assemble ( rule -- assemble_addr )    \ address of cfa of the word to execute inside optimizing word
+    with CELL+ CELL+
+;
+
+: target? ( rule -- target? )   \ address of the flag which is true if the optimizing word is a target word
+    with CELL+ @
+;
+
+0 VALUE RULES_LINK \ address of the last rule
+
+: COMPILE_RULE ( "word1 ... wordx" -- element_count ) \ compile elements into the rule until 'with' is found
+    0 ( counter )
+    BEGIN
+        NEXT-WORD DUP COUNT S" WITH" COMPARE WHILE
+        [ INTERPRETER ] TFIND [ HOST ]
+        IF , 1+ ELSE
+            TRUE ABORT" unknown target word"
+        THEN
+    REPEAT DROP
+;
+
+: (WITH) ( "word" -- ) \ compile optimizing word and target flag into the rule
+    NEXT-WORD
+    [ INTERPRETER ] TFIND [ HOST ]
+    CASE
+     1 OF , FALSE , ENDOF \ compiler word
+    -1 OF ,  TRUE , ENDOF \ target word
+     0 OF TRUE ABORT" unknown word" ENDOF
+    ENDCASE
+;
+
+: ASSEMBLE ( "word" -- ) \ compile cfa of the word to execute inside optimizing word ( located inside ASSEMBLER vocabulary )
+    ASM{ ' }ASM
+    CELL NEGATE ALLOT ,
+;
+
+: OPTIMIZE ( -- ) \ compile the rule
+    HERE   RULES_LINK , \ link
+    0 , \ count
+    DUP TO RULES_LINK
+    COMPILE_RULE SWAP count ! \ store count
+    (WITH)
+    0 , \ assemble?
+;
+
+: .RULE ( rule -- ) \ print the rule
+    CR ." OPTIMIZE "
+    DUP elements SWAP count @ 0 DO
+        DUP @ U.H CELL+
+    LOOP
+    ." WITH: " DUP @ U.H
+    CELL+ CELL+ @ ?DUP IF ." ASSEMBLE: " U.H THEN
+;
+
+: .RULES ( -- ) \ print all the rules
+    RULES_LINK BEGIN
+        DUP .RULE
+        @
+    DUP 0= UNTIL
+    DROP
+;
+
+: @LIT ( n -- lit ) \ get n-th literal from the queue
+    DUP lit? @ INVERT ABORT" literal needed"
+    lit @
+;
+
+: @LITERAL ( -- n ) \ last literal
+    1 Nth @LIT
+;
+
+: @LITERAL2 ( -- n ) \ second literal
+    2 Nth @LIT
+;
+
+: @LITERALS ( -- n2 n1 ) \ two last literals
+    @LITERAL2
+    @LITERAL
+;
+
+INTERPRETER
+
+: OPTIMIZE OPTIMIZE ;
+: ASSEMBLE ASSEMBLE ;
+
+COMPILER
+
+: NOCODE ;  \
+: LIT ;     \ just a marker for literal inside a rule
+
+ALSO COMPILING ' LIT HOST CONSTANT 'LIT         \ cfa of LIT
+ALSO COMPILING ' NOCODE HOST CONSTANT 'NOCODE   \ cfa of NOCODE
+
+HOST
+
+VECT RULEX \ word to execute inside an optimizing word
+
+\ return true if element in the queue matches cfa given  or is literal when LIT given
+: ELEMENT? ( cfa|lit queue_pos -- f )
+    Nth >R
+    DUP 'LIT = IF \ literal
+        DROP R> lit? @
+    ELSE
+        R> cfa @ =
+    THEN
+;
+
+\ check if all rule elements match the queue
+: COMPARE_RULE ( rule -- f ) \ true if rule applicable
+    DUP count @ SWAP elements OVER 1- CELLS + SWAP 0 DO \ addr
+        DUP @   I ELEMENT? INVERT IF DROP FALSE UNLOOP EXIT THEN
+        CELL-
+    LOOP
+    DROP TRUE
+;
+
+: APPLICABLE? ( rule -- f ) \ check length and then appliance of the rule
+    DUP count @ qSize > IF
+        DROP FALSE
+    ELSE
+        COMPARE_RULE
+    THEN
+;
+
+\ remove all compiled code for the rule,
+\ execute optimizing word,
+\ clean up the queue
+: APPLY-RULE ( rule -- )
+    DUP >R count @ 1- Nth address @ CDATA-ORG \ move THERE to starting point
+    R@ with @ R@ target? IF \ target word
+        CDATA-THERE OVER ( cfa there cfa ) \ save current there
+        [ INTERPRETER ] COMPILE, [ HOST ] \ compile word
+        CDATA-THERE SWAP CDATA-ORG \ move there to saved point
+        R> count @ qCLEAR \ clear queue
+        SWAP CFA>OPT \ put word to the queue
+        CDATA-ORG \ move to the end
+    ELSE
+        DUP 'NOCODE <> IF
+            CDATA-THERE OVER ( cfa there cfa ) \ save current there
+            R@ assemble @ TO RULEX  \ set RULEX
+            -ROT 2>R EXECUTE 2R> \ execute optimizing word
+            CDATA-THERE SWAP CDATA-ORG \ move there to saved point
+            -ENQUEUE? INVERT IF \ last compiled was literal-compiling word?
+                R> count @ qCLEAR \ clear 'count' top elements of the queue
+                SWAP CFA>OPT \ put word to the queue
+            ELSE NIP RDROP FALSE TO -ENQUEUE? THEN
+            CDATA-ORG \ move to the end
+        ELSE \ simply remove the code
+            DROP
+            R> count @ qCLEAR \ clear queue
+        THEN
+    THEN
+;
+
+: ONESTEP ( -- f:stop ) \ optimize one time, return true if no rules were matched
+\ queue size is 2 or more
+    RULES_LINK BEGIN \ check all the rules
+        DUP APPLICABLE? IF APPLY-RULE FALSE EXIT THEN
+        @
+    DUP 0= UNTIL
+    DROP TRUE
+;
+
+: OPT ( -- ) \ optimize the queue
+    O_OPTIMIZE IF \ if optimizer flag is set ( see options.spf )
+        BEGIN
+\            .QUEUE
+            qSize 1 > IF \ queue size >= 2
+                ONESTEP
+            ELSE TRUE THEN
+        UNTIL
+    THEN
+;

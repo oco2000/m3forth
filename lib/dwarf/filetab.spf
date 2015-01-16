@@ -1,0 +1,38 @@
+\ store filename list with its indices
+
+S" /lib/include/str_list.f" INCLUDED \ simple list
+
+0 \ list element structure
+    CELL -- il_index  \ index
+    CELL -- il_count  \ count of symbols in string
+    0    -- il_string \ string
+CONSTANT /il
+
+VARIABLE file_list \ the list
+
+: add_to_list ( index a u list -- ) \ add index and name to the list
+    >R /il OVER + ALLOCATE THROW \ allocate memoty for data and string
+    >R DUP R@ il_count ! ( index a u )
+    R@ il_string SWAP CMOVE ( index )
+    R@ il_index !
+    R> R> AddNode
+;
+
+: add_file ( index a u -- ) \ add file to file_list
+    file_list add_to_list
+;
+
+: inList ( addr u list -- addr | 0 - not found ) \ search string
+  -ROT 2>R FirstNode
+  BEGIN
+    DUP
+  WHILE
+    DUP NodeValue DUP il_string SWAP il_count @ 2R@ COMPARE 0= IF 2R> 2DROP EXIT THEN
+    NextNode
+  REPEAT 2R> 2DROP
+;
+
+: get_file_index ( a u -- index | 0 - not found ) \ get index of file by its name
+    file_list inList DUP IF NodeValue il_index @ THEN
+;
+

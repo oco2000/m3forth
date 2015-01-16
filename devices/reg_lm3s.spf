@@ -1,0 +1,1887 @@
+TARGET   HEX
+
+\ Base registers
+
+40000000 EQU PERIPH_BASE
+
+PERIPH_BASE
+00000 BASE: WATCHDOG_BASE           \ Watchdog
+04000 BASE: GPIO_PORTA_BASE         \ GPIO Port A
+05000 BASE: GPIO_PORTB_BASE         \ GPIO Port B
+06000 BASE: GPIO_PORTC_BASE         \ GPIO Port C
+07000 BASE: GPIO_PORTD_BASE         \ GPIO Port D
+08000 BASE: SSI0_BASE               \ SSI0
+09000 BASE: SSI1_BASE               \ SSI1
+0C000 BASE: UART0_BASE              \ UART0
+0D000 BASE: UART1_BASE              \ UART1
+0E000 BASE: UART2_BASE              \ UART2
+20000 BASE: I2C0_MASTER_BASE        \ I2C0 Master
+20800 BASE: I2C0_SLAVE_BASE         \ I2C0 Slave
+21000 BASE: I2C1_MASTER_BASE        \ I2C1 Master
+21800 BASE: I2C1_SLAVE_BASE         \ I2C1 Slave
+24000 BASE: GPIO_PORTE_BASE         \ GPIO Port E
+25000 BASE: GPIO_PORTF_BASE         \ GPIO Port F
+26000 BASE: GPIO_PORTG_BASE         \ GPIO Port G
+27000 BASE: GPIO_PORTH_BASE         \ GPIO Port H
+28000 BASE: PWM_BASE                \ PWM
+2C000 BASE: QEI0_BASE               \ QEI0
+2D000 BASE: QEI1_BASE               \ QEI1
+30000 BASE: TIMER0_BASE             \ Timer0
+31000 BASE: TIMER1_BASE             \ Timer1
+32000 BASE: TIMER2_BASE             \ Timer2
+33000 BASE: TIMER3_BASE             \ Timer3
+38000 BASE: ADC_BASE                \ ADC
+3C000 BASE: COMP_BASE               \ Analog comparators
+40000 BASE: CAN0_BASE               \ CAN0
+41000 BASE: CAN1_BASE               \ CAN1
+42000 BASE: CAN2_BASE               \ CAN2
+48000 BASE: ETH_BASE                \ Ethernet
+48000 BASE: MAC_BASE                \ Ethernet
+50000 BASE: USB0_BASE               \ USB 0 Controller
+58000 BASE: GPIO_PORTA_AHB_BASE     \ GPIO Port A (high speed)
+59000 BASE: GPIO_PORTB_AHB_BASE     \ GPIO Port B (high speed)
+5A000 BASE: GPIO_PORTC_AHB_BASE     \ GPIO Port C (high speed)
+5B000 BASE: GPIO_PORTD_AHB_BASE     \ GPIO Port D (high speed)
+5C000 BASE: GPIO_PORTE_AHB_BASE     \ GPIO Port E (high speed)
+5D000 BASE: GPIO_PORTF_AHB_BASE     \ GPIO Port F (high speed)
+5E000 BASE: GPIO_PORTG_AHB_BASE     \ GPIO Port G (high speed)
+5F000 BASE: GPIO_PORTH_AHB_BASE     \ GPIO Port H (high speed)
+FC000 BASE: HIB_BASE                \ Hibernation Module
+FD000 BASE: FLASH_CTRL_BASE         \ FLASH Controller
+FE000 BASE: SYSCTL_BASE             \ System Control
+FF000 BASE: UDMA_BASE               \ uDMA Controller
+DROP
+
+00000040 EQU PWM_GEN_0_OFFSET       \ PWM0 base
+00000080 EQU PWM_GEN_1_OFFSET       \ PWM1 base
+000000C0 EQU PWM_GEN_2_OFFSET       \ PWM2 base
+00000100 EQU PWM_GEN_3_OFFSET       \ PWM3 base
+
+DECIMAL
+\ ----------       Watchdog Timer (WDT)                           -----------*/
+WATCHDOG_BASE
+    CELL FIELD: WDT_LOAD             \ Load register
+    CELL FIELD: WDT_VALUE            \ Current value register
+    CELL FIELD: WDT_CTL              \ Control register
+    CELL FIELD: WDT_ICR              \ Interrupt clear register
+    CELL FIELD: WDT_RIS              \ Raw interrupt status register
+    CELL FIELD: WDT_MIS              \ Masked interrupt status register
+    1024 +
+    CELL FIELD: WDT_TEST             \ Test register
+    2020 +
+    CELL FIELD: WDT_LOCK             \ Lock register
+DROP
+
+\ ----------       System Controller (SYSCTL)                     -----------*/
+SYSCTL_BASE
+    CELL FIELD: SYSCTL_DID0             \ Device identification register 0
+    CELL FIELD: SYSCTL_DID1             \ Device identification register 1
+    CELL FIELD: SYSCTL_DC0              \ Device capabilities register 0
+    4 +
+    CELL FIELD: SYSCTL_DC1              \ Device capabilities register 1
+    CELL FIELD: SYSCTL_DC2              \ Device capabilities register 2
+    CELL FIELD: SYSCTL_DC3              \ Device capabilities register 3
+    CELL FIELD: SYSCTL_DC4              \ Device capabilities register 4
+    CELL FIELD: SYSCTL_DC5              \ Device capabilities register 5
+    CELL FIELD: SYSCTL_DC6              \ Device capabilities register 6
+    CELL FIELD: SYSCTL_DC7              \ Device capabilities register 7
+    CELL FIELD: SYSCTL_DC8              \ Device capabilities register 8
+    CELL FIELD: SYSCTL_PBORCTL          \ POR/BOR reset control register
+    CELL FIELD: SYSCTL_LDOPCTL          \ LDO power control register
+    8 +
+    CELL FIELD: SYSCTL_SRCR0            \ Software reset control reg 0
+    CELL FIELD: SYSCTL_SRCR1            \ Software reset control reg 1
+    CELL FIELD: SYSCTL_SRCR2            \ Software reset control reg 2
+    4 +
+    CELL FIELD: SYSCTL_RIS              \ Raw interrupt status register
+    CELL FIELD: SYSCTL_IMC              \ Interrupt mask/control register
+    CELL FIELD: SYSCTL_MISC             \ Interrupt status register
+    CELL FIELD: SYSCTL_RESC             \ Reset cause register
+    CELL FIELD: SYSCTL_RCC              \ Run-mode clock config register
+    CELL FIELD: SYSCTL_PLLCFG           \ PLL configuration register
+    4 +
+    CELL FIELD: SYSCTL_GPIOHBCTL        \ GPIO High-Performance Bus Control
+    SYSCTL_GPIOHBCTL EQU SYSCTL_GPIOHSCTL          \ [    ] GPIO High Speed Control
+    CELL FIELD: SYSCTL_RCC2             \ Run-mode clock config register 2
+    8 +
+    CELL FIELD: SYSCTL_MOSCCTL          \ Main Oscillator Control
+    128 +
+    CELL FIELD: SYSCTL_RCGC0            \ Run-mode clock gating register 0
+    CELL FIELD: SYSCTL_RCGC1            \ Run-mode clock gating register 1
+    CELL FIELD: SYSCTL_RCGC2            \ Run-mode clock gating register 2
+    4 +
+    CELL FIELD: SYSCTL_SCGC0            \ Sleep-mode clock gating reg 0
+    CELL FIELD: SYSCTL_SCGC1            \ Sleep-mode clock gating reg 1
+    CELL FIELD: SYSCTL_SCGC2            \ Sleep-mode clock gating reg 2
+    4 +
+    CELL FIELD: SYSCTL_DCGC0            \ Deep Sleep-mode clock gate reg 0
+    CELL FIELD: SYSCTL_DCGC1            \ Deep Sleep-mode clock gate reg 1
+    CELL FIELD: SYSCTL_DCGC2            \ Deep Sleep-mode clock gate reg 2
+    24 +
+    CELL FIELD: SYSCTL_DSLPCLKCFG       \ Deep Sleep-mode clock config reg
+    8 +
+    CELL FIELD: SYSCTL_PIOSCCAL         \ Precision Internal Oscillator Calibration
+    CELL FIELD: SYSCTL_PIOSCSTAT        \ Precision Internal Oscillator Statistics
+    8 +
+    CELL FIELD: SYSCTL_LDOARST          \ LDO reset control register
+    12 +
+    CELL FIELD: SYSCTL_I2SMCLKCFG       \ I2S MCLK Configuration
+    28 +
+    CELL FIELD: SYSCTL_DC9              \ Device capabilities register 9
+    12 +
+    CELL FIELD: SYSCTL_NVMSTAT          \ Non-Volitile Memory Information
+DROP
+
+\ ----------       General Purpose Input/Output (GPIO)            -----------*/
+GPIO_PORTA_BASE
+    255 CELLS FIELD: GPIOA_DATA_Bits   \ Bit specific data registers
+    CELL FIELD: GPIOA_DATA             \ Data register
+    CELL FIELD: GPIOA_DIR              \ Data direction register
+    CELL FIELD: GPIOA_IS               \ Interrupt sense register
+    CELL FIELD: GPIOA_IBE              \ Interrupt both edges register
+    CELL FIELD: GPIOA_IEV              \ Interrupt event register
+    CELL FIELD: GPIOA_IM               \ Interrupt mask register
+    CELL FIELD: GPIOA_RIS              \ Raw interrupt status register
+    CELL FIELD: GPIOA_MIS              \ Masked interrupt status reg
+    CELL FIELD: GPIOA_ICR              \ Interrupt clear register
+    CELL FIELD: GPIOA_AFSEL            \ Mode control select register
+    220 +
+    CELL FIELD: GPIOA_DR2R             \ 2ma drive select register
+    CELL FIELD: GPIOA_DR4R             \ 4ma drive select register
+    CELL FIELD: GPIOA_DR8R             \ 8ma drive select register
+    CELL FIELD: GPIOA_ODR              \ Open drain select register
+    CELL FIELD: GPIOA_PUR              \ Pull up select register
+    CELL FIELD: GPIOA_PDR              \ Pull down select register
+    CELL FIELD: GPIOA_SLR              \ Slew rate control enable reg
+    CELL FIELD: GPIOA_DEN              \ Digital input enable register
+    CELL FIELD: GPIOA_LOCK             \ Lock register
+    CELL FIELD: GPIOA_CR               \ Commit register
+    CELL FIELD: GPIOA_AMSEL            \ GPIO Analog Mode Select
+    CELL FIELD: GPIOA_PCTL             \ GPIO Port Control
+DROP
+
+GPIO_PORTB_BASE
+    255 CELLS FIELD: GPIOB_DATA_Bits   \ Bit specific data registers
+    CELL FIELD: GPIOB_DATA             \ Data register
+    CELL FIELD: GPIOB_DIR              \ Data direction register
+    CELL FIELD: GPIOB_IS               \ Interrupt sense register
+    CELL FIELD: GPIOB_IBE              \ Interrupt both edges register
+    CELL FIELD: GPIOB_IEV              \ Interrupt event register
+    CELL FIELD: GPIOB_IM               \ Interrupt mask register
+    CELL FIELD: GPIOB_RIS              \ Raw interrupt status register
+    CELL FIELD: GPIOB_MIS              \ Masked interrupt status reg
+    CELL FIELD: GPIOB_ICR              \ Interrupt clear register
+    CELL FIELD: GPIOB_AFSEL            \ Mode control select register
+    220 +
+    CELL FIELD: GPIOB_DR2R             \ 2ma drive select register
+    CELL FIELD: GPIOB_DR4R             \ 4ma drive select register
+    CELL FIELD: GPIOB_DR8R             \ 8ma drive select register
+    CELL FIELD: GPIOB_ODR              \ Open drain select register
+    CELL FIELD: GPIOB_PUR              \ Pull up select register
+    CELL FIELD: GPIOB_PDR              \ Pull down select register
+    CELL FIELD: GPIOB_SLR              \ Slew rate control enable reg
+    CELL FIELD: GPIOB_DEN              \ Digital input enable register
+    CELL FIELD: GPIOB_LOCK             \ Lock register
+    CELL FIELD: GPIOB_CR               \ Commit register
+    CELL FIELD: GPIOB_AMSEL            \ GPIO Analog Mode Select
+    CELL FIELD: GPIOB_PCTL             \ GPIO Port Control
+DROP
+
+GPIO_PORTC_BASE
+    255 CELLS FIELD: GPIOC_DATA_Bits   \ Bit specific data registers
+    CELL FIELD: GPIOC_DATA             \ Data register
+    CELL FIELD: GPIOC_DIR              \ Data direction register
+    CELL FIELD: GPIOC_IS               \ Interrupt sense register
+    CELL FIELD: GPIOC_IBE              \ Interrupt both edges register
+    CELL FIELD: GPIOC_IEV              \ Interrupt event register
+    CELL FIELD: GPIOC_IM               \ Interrupt mask register
+    CELL FIELD: GPIOC_RIS              \ Raw interrupt status register
+    CELL FIELD: GPIOC_MIS              \ Masked interrupt status reg
+    CELL FIELD: GPIOC_ICR              \ Interrupt clear register
+    CELL FIELD: GPIOC_AFSEL            \ Mode control select register
+    220 +
+    CELL FIELD: GPIOC_DR2R             \ 2ma drive select register
+    CELL FIELD: GPIOC_DR4R             \ 4ma drive select register
+    CELL FIELD: GPIOC_DR8R             \ 8ma drive select register
+    CELL FIELD: GPIOC_ODR              \ Open drain select register
+    CELL FIELD: GPIOC_PUR              \ Pull up select register
+    CELL FIELD: GPIOC_PDR              \ Pull down select register
+    CELL FIELD: GPIOC_SLR              \ Slew rate control enable reg
+    CELL FIELD: GPIOC_DEN              \ Digital input enable register
+    CELL FIELD: GPIOC_LOCK             \ Lock register
+    CELL FIELD: GPIOC_CR               \ Commit register
+    CELL FIELD: GPIOC_AMSEL            \ GPIO Analog Mode Select
+    CELL FIELD: GPIOC_PCTL             \ GPIO Port Control
+DROP
+
+GPIO_PORTD_BASE
+    255 CELLS FIELD: GPIOD_DATA_Bits   \ Bit specific data registers
+    CELL FIELD: GPIOD_DATA             \ Data register
+    CELL FIELD: GPIOD_DIR              \ Data direction register
+    CELL FIELD: GPIOD_IS               \ Interrupt sense register
+    CELL FIELD: GPIOD_IBE              \ Interrupt both edges register
+    CELL FIELD: GPIOD_IEV              \ Interrupt event register
+    CELL FIELD: GPIOD_IM               \ Interrupt mask register
+    CELL FIELD: GPIOD_RIS              \ Raw interrupt status register
+    CELL FIELD: GPIOD_MIS              \ Masked interrupt status reg
+    CELL FIELD: GPIOD_ICR              \ Interrupt clear register
+    CELL FIELD: GPIOD_AFSEL            \ Mode control select register
+    220 +
+    CELL FIELD: GPIOD_DR2R             \ 2ma drive select register
+    CELL FIELD: GPIOD_DR4R             \ 4ma drive select register
+    CELL FIELD: GPIOD_DR8R             \ 8ma drive select register
+    CELL FIELD: GPIOD_ODR              \ Open drain select register
+    CELL FIELD: GPIOD_PUR              \ Pull up select register
+    CELL FIELD: GPIOD_PDR              \ Pull down select register
+    CELL FIELD: GPIOD_SLR              \ Slew rate control enable reg
+    CELL FIELD: GPIOD_DEN              \ Digital input enable register
+    CELL FIELD: GPIOD_LOCK             \ Lock register
+    CELL FIELD: GPIOD_CR               \ Commit register
+    CELL FIELD: GPIOD_AMSEL            \ GPIO Analog Mode Select
+    CELL FIELD: GPIOD_PCTL             \ GPIO Port Control
+DROP
+
+GPIO_PORTE_BASE
+    255 CELLS FIELD: GPIOE_DATA_Bits   \ Bit specific data registers
+    CELL FIELD: GPIOE_DATA             \ Data register
+    CELL FIELD: GPIOE_DIR              \ Data direction register
+    CELL FIELD: GPIOE_IS               \ Interrupt sense register
+    CELL FIELD: GPIOE_IBE              \ Interrupt both edges register
+    CELL FIELD: GPIOE_IEV              \ Interrupt event register
+    CELL FIELD: GPIOE_IM               \ Interrupt mask register
+    CELL FIELD: GPIOE_RIS              \ Raw interrupt status register
+    CELL FIELD: GPIOE_MIS              \ Masked interrupt status reg
+    CELL FIELD: GPIOE_ICR              \ Interrupt clear register
+    CELL FIELD: GPIOE_AFSEL            \ Mode control select register
+    220 +
+    CELL FIELD: GPIOE_DR2R             \ 2ma drive select register
+    CELL FIELD: GPIOE_DR4R             \ 4ma drive select register
+    CELL FIELD: GPIOE_DR8R             \ 8ma drive select register
+    CELL FIELD: GPIOE_ODR              \ Open drain select register
+    CELL FIELD: GPIOE_PUR              \ Pull up select register
+    CELL FIELD: GPIOE_PDR              \ Pull down select register
+    CELL FIELD: GPIOE_SLR              \ Slew rate control enable reg
+    CELL FIELD: GPIOE_DEN              \ Digital input enable register
+    CELL FIELD: GPIOE_LOCK             \ Lock register
+    CELL FIELD: GPIOE_CR               \ Commit register
+    CELL FIELD: GPIOE_AMSEL            \ GPIO Analog Mode Select
+    CELL FIELD: GPIOE_PCTL             \ GPIO Port Control
+DROP
+
+GPIO_PORTF_BASE
+    255 CELLS FIELD: GPIOF_DATA_Bits   \ Bit specific data registers
+    CELL FIELD: GPIOF_DATA             \ Data register
+    CELL FIELD: GPIOF_DIR              \ Data direction register
+    CELL FIELD: GPIOF_IS               \ Interrupt sense register
+    CELL FIELD: GPIOF_IBE              \ Interrupt both edges register
+    CELL FIELD: GPIOF_IEV              \ Interrupt event register
+    CELL FIELD: GPIOF_IM               \ Interrupt mask register
+    CELL FIELD: GPIOF_RIS              \ Raw interrupt status register
+    CELL FIELD: GPIOF_MIS              \ Masked interrupt status reg
+    CELL FIELD: GPIOF_ICR              \ Interrupt clear register
+    CELL FIELD: GPIOF_AFSEL            \ Mode control select register
+    220 +
+    CELL FIELD: GPIOF_DR2R             \ 2ma drive select register
+    CELL FIELD: GPIOF_DR4R             \ 4ma drive select register
+    CELL FIELD: GPIOF_DR8R             \ 8ma drive select register
+    CELL FIELD: GPIOF_ODR              \ Open drain select register
+    CELL FIELD: GPIOF_PUR              \ Pull up select register
+    CELL FIELD: GPIOF_PDR              \ Pull down select register
+    CELL FIELD: GPIOF_SLR              \ Slew rate control enable reg
+    CELL FIELD: GPIOF_DEN              \ Digital input enable register
+    CELL FIELD: GPIOF_LOCK             \ Lock register
+    CELL FIELD: GPIOF_CR               \ Commit register
+    CELL FIELD: GPIOF_AMSEL            \ GPIO Analog Mode Select
+    CELL FIELD: GPIOF_PCTL             \ GPIO Port Control
+DROP
+
+GPIO_PORTG_BASE
+    255 CELLS FIELD: GPIOG_DATA_Bits   \ Bit specific data registers
+    CELL FIELD: GPIOG_DATA             \ Data register
+    CELL FIELD: GPIOG_DIR              \ Data direction register
+    CELL FIELD: GPIOG_IS               \ Interrupt sense register
+    CELL FIELD: GPIOG_IBE              \ Interrupt both edges register
+    CELL FIELD: GPIOG_IEV              \ Interrupt event register
+    CELL FIELD: GPIOG_IM               \ Interrupt mask register
+    CELL FIELD: GPIOG_RIS              \ Raw interrupt status register
+    CELL FIELD: GPIOG_MIS              \ Masked interrupt status reg
+    CELL FIELD: GPIOG_ICR              \ Interrupt clear register
+    CELL FIELD: GPIOG_AFSEL            \ Mode control select register
+    220 +
+    CELL FIELD: GPIOG_DR2R             \ 2ma drive select register
+    CELL FIELD: GPIOG_DR4R             \ 4ma drive select register
+    CELL FIELD: GPIOG_DR8R             \ 8ma drive select register
+    CELL FIELD: GPIOG_ODR              \ Open drain select register
+    CELL FIELD: GPIOG_PUR              \ Pull up select register
+    CELL FIELD: GPIOG_PDR              \ Pull down select register
+    CELL FIELD: GPIOG_SLR              \ Slew rate control enable reg
+    CELL FIELD: GPIOG_DEN              \ Digital input enable register
+    CELL FIELD: GPIOG_LOCK             \ Lock register
+    CELL FIELD: GPIOG_CR               \ Commit register
+    CELL FIELD: GPIOG_AMSEL            \ GPIO Analog Mode Select
+    CELL FIELD: GPIOG_PCTL             \ GPIO Port Control
+DROP
+
+GPIO_PORTA_AHB_BASE
+    255 CELLS FIELD: GPIOA_HS_DATA_Bits   \ Bit specific data registers
+    CELL FIELD: GPIOA_HS_DATA             \ Data register
+    CELL FIELD: GPIOA_HS_DIR              \ Data direction register
+    CELL FIELD: GPIOA_HS_IS               \ Interrupt sense register
+    CELL FIELD: GPIOA_HS_IBE              \ Interrupt both edges register
+    CELL FIELD: GPIOA_HS_IEV              \ Interrupt event register
+    CELL FIELD: GPIOA_HS_IM               \ Interrupt mask register
+    CELL FIELD: GPIOA_HS_RIS              \ Raw interrupt status register
+    CELL FIELD: GPIOA_HS_MIS              \ Masked interrupt status reg
+    CELL FIELD: GPIOA_HS_ICR              \ Interrupt clear register
+    CELL FIELD: GPIOA_HS_AFSEL            \ Mode control select register
+    220 +
+    CELL FIELD: GPIOA_HS_DR2R             \ 2ma drive select register
+    CELL FIELD: GPIOA_HS_DR4R             \ 4ma drive select register
+    CELL FIELD: GPIOA_HS_DR8R             \ 8ma drive select register
+    CELL FIELD: GPIOA_HS_ODR              \ Open drain select register
+    CELL FIELD: GPIOA_HS_PUR              \ Pull up select register
+    CELL FIELD: GPIOA_HS_PDR              \ Pull down select register
+    CELL FIELD: GPIOA_HS_SLR              \ Slew rate control enable reg
+    CELL FIELD: GPIOA_HS_DEN              \ Digital input enable register
+    CELL FIELD: GPIOA_HS_LOCK             \ Lock register
+    CELL FIELD: GPIOA_HS_CR               \ Commit register
+    CELL FIELD: GPIOA_HS_AMSEL            \ GPIO Analog Mode Select
+    CELL FIELD: GPIOA_HS_PCTL             \ GPIO Port Control
+DROP
+
+GPIO_PORTB_AHB_BASE
+    255 CELLS FIELD: GPIOB_HS_DATA_Bits   \ Bit specific data registers
+    CELL FIELD: GPIOB_HS_DATA             \ Data register
+    CELL FIELD: GPIOB_HS_DIR              \ Data direction register
+    CELL FIELD: GPIOB_HS_IS               \ Interrupt sense register
+    CELL FIELD: GPIOB_HS_IBE              \ Interrupt both edges register
+    CELL FIELD: GPIOB_HS_IEV              \ Interrupt event register
+    CELL FIELD: GPIOB_HS_IM               \ Interrupt mask register
+    CELL FIELD: GPIOB_HS_RIS              \ Raw interrupt status register
+    CELL FIELD: GPIOB_HS_MIS              \ Masked interrupt status reg
+    CELL FIELD: GPIOB_HS_ICR              \ Interrupt clear register
+    CELL FIELD: GPIOB_HS_AFSEL            \ Mode control select register
+    220 +
+    CELL FIELD: GPIOB_HS_DR2R             \ 2ma drive select register
+    CELL FIELD: GPIOB_HS_DR4R             \ 4ma drive select register
+    CELL FIELD: GPIOB_HS_DR8R             \ 8ma drive select register
+    CELL FIELD: GPIOB_HS_ODR              \ Open drain select register
+    CELL FIELD: GPIOB_HS_PUR              \ Pull up select register
+    CELL FIELD: GPIOB_HS_PDR              \ Pull down select register
+    CELL FIELD: GPIOB_HS_SLR              \ Slew rate control enable reg
+    CELL FIELD: GPIOB_HS_DEN              \ Digital input enable register
+    CELL FIELD: GPIOB_HS_LOCK             \ Lock register
+    CELL FIELD: GPIOB_HS_CR               \ Commit register
+    CELL FIELD: GPIOB_HS_AMSEL            \ GPIO Analog Mode Select
+    CELL FIELD: GPIOB_HS_PCTL             \ GPIO Port Control
+DROP
+
+GPIO_PORTC_AHB_BASE
+    255 CELLS FIELD: GPIOC_HS_DATA_Bits   \ Bit specific data registers
+    CELL FIELD: GPIOC_HS_DATA             \ Data register
+    CELL FIELD: GPIOC_HS_DIR              \ Data direction register
+    CELL FIELD: GPIOC_HS_IS               \ Interrupt sense register
+    CELL FIELD: GPIOC_HS_IBE              \ Interrupt both edges register
+    CELL FIELD: GPIOC_HS_IEV              \ Interrupt event register
+    CELL FIELD: GPIOC_HS_IM               \ Interrupt mask register
+    CELL FIELD: GPIOC_HS_RIS              \ Raw interrupt status register
+    CELL FIELD: GPIOC_HS_MIS              \ Masked interrupt status reg
+    CELL FIELD: GPIOC_HS_ICR              \ Interrupt clear register
+    CELL FIELD: GPIOC_HS_AFSEL            \ Mode control select register
+    220 +
+    CELL FIELD: GPIOC_HS_DR2R             \ 2ma drive select register
+    CELL FIELD: GPIOC_HS_DR4R             \ 4ma drive select register
+    CELL FIELD: GPIOC_HS_DR8R             \ 8ma drive select register
+    CELL FIELD: GPIOC_HS_ODR              \ Open drain select register
+    CELL FIELD: GPIOC_HS_PUR              \ Pull up select register
+    CELL FIELD: GPIOC_HS_PDR              \ Pull down select register
+    CELL FIELD: GPIOC_HS_SLR              \ Slew rate control enable reg
+    CELL FIELD: GPIOC_HS_DEN              \ Digital input enable register
+    CELL FIELD: GPIOC_HS_LOCK             \ Lock register
+    CELL FIELD: GPIOC_HS_CR               \ Commit register
+    CELL FIELD: GPIOC_HS_AMSEL            \ GPIO Analog Mode Select
+    CELL FIELD: GPIOC_HS_PCTL             \ GPIO Port Control
+DROP
+
+GPIO_PORTD_AHB_BASE
+    255 CELLS FIELD: GPIOD_HS_DATA_Bits   \ Bit specific data registers
+    CELL FIELD: GPIOD_HS_DATA             \ Data register
+    CELL FIELD: GPIOD_HS_DIR              \ Data direction register
+    CELL FIELD: GPIOD_HS_IS               \ Interrupt sense register
+    CELL FIELD: GPIOD_HS_IBE              \ Interrupt both edges register
+    CELL FIELD: GPIOD_HS_IEV              \ Interrupt event register
+    CELL FIELD: GPIOD_HS_IM               \ Interrupt mask register
+    CELL FIELD: GPIOD_HS_RIS              \ Raw interrupt status register
+    CELL FIELD: GPIOD_HS_MIS              \ Masked interrupt status reg
+    CELL FIELD: GPIOD_HS_ICR              \ Interrupt clear register
+    CELL FIELD: GPIOD_HS_AFSEL            \ Mode control select register
+    220 +
+    CELL FIELD: GPIOD_HS_DR2R             \ 2ma drive select register
+    CELL FIELD: GPIOD_HS_DR4R             \ 4ma drive select register
+    CELL FIELD: GPIOD_HS_DR8R             \ 8ma drive select register
+    CELL FIELD: GPIOD_HS_ODR              \ Open drain select register
+    CELL FIELD: GPIOD_HS_PUR              \ Pull up select register
+    CELL FIELD: GPIOD_HS_PDR              \ Pull down select register
+    CELL FIELD: GPIOD_HS_SLR              \ Slew rate control enable reg
+    CELL FIELD: GPIOD_HS_DEN              \ Digital input enable register
+    CELL FIELD: GPIOD_HS_LOCK             \ Lock register
+    CELL FIELD: GPIOD_HS_CR               \ Commit register
+    CELL FIELD: GPIOD_HS_AMSEL            \ GPIO Analog Mode Select
+    CELL FIELD: GPIOD_HS_PCTL             \ GPIO Port Control
+DROP
+
+GPIO_PORTE_AHB_BASE
+    255 CELLS FIELD: GPIOE_HS_DATA_Bits   \ Bit specific data registers
+    CELL FIELD: GPIOE_HS_DATA             \ Data register
+    CELL FIELD: GPIOE_HS_DIR              \ Data direction register
+    CELL FIELD: GPIOE_HS_IS               \ Interrupt sense register
+    CELL FIELD: GPIOE_HS_IBE              \ Interrupt both edges register
+    CELL FIELD: GPIOE_HS_IEV              \ Interrupt event register
+    CELL FIELD: GPIOE_HS_IM               \ Interrupt mask register
+    CELL FIELD: GPIOE_HS_RIS              \ Raw interrupt status register
+    CELL FIELD: GPIOE_HS_MIS              \ Masked interrupt status reg
+    CELL FIELD: GPIOE_HS_ICR              \ Interrupt clear register
+    CELL FIELD: GPIOE_HS_AFSEL            \ Mode control select register
+    220 +
+    CELL FIELD: GPIOE_HS_DR2R             \ 2ma drive select register
+    CELL FIELD: GPIOE_HS_DR4R             \ 4ma drive select register
+    CELL FIELD: GPIOE_HS_DR8R             \ 8ma drive select register
+    CELL FIELD: GPIOE_HS_ODR              \ Open drain select register
+    CELL FIELD: GPIOE_HS_PUR              \ Pull up select register
+    CELL FIELD: GPIOE_HS_PDR              \ Pull down select register
+    CELL FIELD: GPIOE_HS_SLR              \ Slew rate control enable reg
+    CELL FIELD: GPIOE_HS_DEN              \ Digital input enable register
+    CELL FIELD: GPIOE_HS_LOCK             \ Lock register
+    CELL FIELD: GPIOE_HS_CR               \ Commit register
+    CELL FIELD: GPIOE_HS_AMSEL            \ GPIO Analog Mode Select
+    CELL FIELD: GPIOE_HS_PCTL             \ GPIO Port Control
+DROP
+
+GPIO_PORTF_AHB_BASE
+    255 CELLS FIELD: GPIOF_HS_DATA_Bits   \ Bit specific data registers
+    CELL FIELD: GPIOF_HS_DATA             \ Data register
+    CELL FIELD: GPIOF_HS_DIR              \ Data direction register
+    CELL FIELD: GPIOF_HS_IS               \ Interrupt sense register
+    CELL FIELD: GPIOF_HS_IBE              \ Interrupt both edges register
+    CELL FIELD: GPIOF_HS_IEV              \ Interrupt event register
+    CELL FIELD: GPIOF_HS_IM               \ Interrupt mask register
+    CELL FIELD: GPIOF_HS_RIS              \ Raw interrupt status register
+    CELL FIELD: GPIOF_HS_MIS              \ Masked interrupt status reg
+    CELL FIELD: GPIOF_HS_ICR              \ Interrupt clear register
+    CELL FIELD: GPIOF_HS_AFSEL            \ Mode control select register
+    220 +
+    CELL FIELD: GPIOF_HS_DR2R             \ 2ma drive select register
+    CELL FIELD: GPIOF_HS_DR4R             \ 4ma drive select register
+    CELL FIELD: GPIOF_HS_DR8R             \ 8ma drive select register
+    CELL FIELD: GPIOF_HS_ODR              \ Open drain select register
+    CELL FIELD: GPIOF_HS_PUR              \ Pull up select register
+    CELL FIELD: GPIOF_HS_PDR              \ Pull down select register
+    CELL FIELD: GPIOF_HS_SLR              \ Slew rate control enable reg
+    CELL FIELD: GPIOF_HS_DEN              \ Digital input enable register
+    CELL FIELD: GPIOF_HS_LOCK             \ Lock register
+    CELL FIELD: GPIOF_HS_CR               \ Commit register
+    CELL FIELD: GPIOF_HS_AMSEL            \ GPIO Analog Mode Select
+    CELL FIELD: GPIOF_HS_PCTL             \ GPIO Port Control
+DROP
+
+GPIO_PORTG_AHB_BASE
+    255 CELLS FIELD: GPIOG_HS_DATA_Bits   \ Bit specific data registers
+    CELL FIELD: GPIOG_HS_DATA             \ Data register
+    CELL FIELD: GPIOG_HS_DIR              \ Data direction register
+    CELL FIELD: GPIOG_HS_IS               \ Interrupt sense register
+    CELL FIELD: GPIOG_HS_IBE              \ Interrupt both edges register
+    CELL FIELD: GPIOG_HS_IEV              \ Interrupt event register
+    CELL FIELD: GPIOG_HS_IM               \ Interrupt mask register
+    CELL FIELD: GPIOG_HS_RIS              \ Raw interrupt status register
+    CELL FIELD: GPIOG_HS_MIS              \ Masked interrupt status reg
+    CELL FIELD: GPIOG_HS_ICR              \ Interrupt clear register
+    CELL FIELD: GPIOG_HS_AFSEL            \ Mode control select register
+    220 +
+    CELL FIELD: GPIOG_HS_DR2R             \ 2ma drive select register
+    CELL FIELD: GPIOG_HS_DR4R             \ 4ma drive select register
+    CELL FIELD: GPIOG_HS_DR8R             \ 8ma drive select register
+    CELL FIELD: GPIOG_HS_ODR              \ Open drain select register
+    CELL FIELD: GPIOG_HS_PUR              \ Pull up select register
+    CELL FIELD: GPIOG_HS_PDR              \ Pull down select register
+    CELL FIELD: GPIOG_HS_SLR              \ Slew rate control enable reg
+    CELL FIELD: GPIOG_HS_DEN              \ Digital input enable register
+    CELL FIELD: GPIOG_HS_LOCK             \ Lock register
+    CELL FIELD: GPIOG_HS_CR               \ Commit register
+    CELL FIELD: GPIOG_HS_AMSEL            \ GPIO Analog Mode Select
+    CELL FIELD: GPIOG_HS_PCTL             \ GPIO Port Control
+DROP
+
+\ ----------       General Purpose Timer (TIMER)                  -----------*/
+TIMER0_BASE
+    CELL FIELD: TIMER0_CFG              \ Configuration register
+    CELL FIELD: TIMER0_TAMR             \ TimerA mode register
+    CELL FIELD: TIMER0_TBMR             \ TimerB mode register
+    CELL FIELD: TIMER0_CTL              \ Control register
+    8 +
+    CELL FIELD: TIMER0_IMR              \ Interrupt mask register
+    CELL FIELD: TIMER0_RIS              \ Interrupt status register
+    CELL FIELD: TIMER0_MIS              \ Masked interrupt status reg
+    CELL FIELD: TIMER0_ICR              \ Interrupt clear register
+    CELL FIELD: TIMER0_TAILR            \ TimerA interval load register
+    CELL FIELD: TIMER0_TBILR            \ TimerB interval load register
+    CELL FIELD: TIMER0_TAMATCHR         \ TimerA match register
+    CELL FIELD: TIMER0_TBMATCHR         \ TimerB match register
+    CELL FIELD: TIMER0_TAPR             \ TimerA prescale register
+    CELL FIELD: TIMER0_TBPR             \ TimerB prescale register
+    CELL FIELD: TIMER0_TAPMR            \ TimerA prescale match register
+    CELL FIELD: TIMER0_TBPMR            \ TimerB prescale match register
+    CELL FIELD: TIMER0_TAR              \ TimerA register
+    CELL FIELD: TIMER0_TBR              \ TimerB register
+    CELL FIELD: TIMER0_TAV              \ GPTM Timer A Value
+    CELL FIELD: TIMER0_TBV              \ GPTM Timer B Value
+DROP
+
+TIMER1_BASE
+    CELL FIELD: TIMER1_CFG              \ Configuration register
+    CELL FIELD: TIMER1_TAMR             \ TimerA mode register
+    CELL FIELD: TIMER1_TBMR             \ TimerB mode register
+    CELL FIELD: TIMER1_CTL              \ Control register
+    8 +
+    CELL FIELD: TIMER1_IMR              \ Interrupt mask register
+    CELL FIELD: TIMER1_RIS              \ Interrupt status register
+    CELL FIELD: TIMER1_MIS              \ Masked interrupt status reg
+    CELL FIELD: TIMER1_ICR              \ Interrupt clear register
+    CELL FIELD: TIMER1_TAILR            \ TimerA interval load register
+    CELL FIELD: TIMER1_TBILR            \ TimerB interval load register
+    CELL FIELD: TIMER1_TAMATCHR         \ TimerA match register
+    CELL FIELD: TIMER1_TBMATCHR         \ TimerB match register
+    CELL FIELD: TIMER1_TAPR             \ TimerA prescale register
+    CELL FIELD: TIMER1_TBPR             \ TimerB prescale register
+    CELL FIELD: TIMER1_TAPMR            \ TimerA prescale match register
+    CELL FIELD: TIMER1_TBPMR            \ TimerB prescale match register
+    CELL FIELD: TIMER1_TAR              \ TimerA register
+    CELL FIELD: TIMER1_TBR              \ TimerB register
+    CELL FIELD: TIMER1_TAV              \ GPTM Timer A Value
+    CELL FIELD: TIMER1_TBV              \ GPTM Timer B Value
+DROP
+
+TIMER2_BASE
+    CELL FIELD: TIMER2_CFG              \ Configuration register
+    CELL FIELD: TIMER2_TAMR             \ TimerA mode register
+    CELL FIELD: TIMER2_TBMR             \ TimerB mode register
+    CELL FIELD: TIMER2_CTL              \ Control register
+    8 +
+    CELL FIELD: TIMER2_IMR              \ Interrupt mask register
+    CELL FIELD: TIMER2_RIS              \ Interrupt status register
+    CELL FIELD: TIMER2_MIS              \ Masked interrupt status reg
+    CELL FIELD: TIMER2_ICR              \ Interrupt clear register
+    CELL FIELD: TIMER2_TAILR            \ TimerA interval load register
+    CELL FIELD: TIMER2_TBILR            \ TimerB interval load register
+    CELL FIELD: TIMER2_TAMATCHR         \ TimerA match register
+    CELL FIELD: TIMER2_TBMATCHR         \ TimerB match register
+    CELL FIELD: TIMER2_TAPR             \ TimerA prescale register
+    CELL FIELD: TIMER2_TBPR             \ TimerB prescale register
+    CELL FIELD: TIMER2_TAPMR            \ TimerA prescale match register
+    CELL FIELD: TIMER2_TBPMR            \ TimerB prescale match register
+    CELL FIELD: TIMER2_TAR              \ TimerA register
+    CELL FIELD: TIMER2_TBR              \ TimerB register
+    CELL FIELD: TIMER2_TAV              \ GPTM Timer A Value
+    CELL FIELD: TIMER2_TBV              \ GPTM Timer B Value
+DROP
+
+TIMER3_BASE
+    CELL FIELD: TIMER3_CFG              \ Configuration register
+    CELL FIELD: TIMER3_TAMR             \ TimerA mode register
+    CELL FIELD: TIMER3_TBMR             \ TimerB mode register
+    CELL FIELD: TIMER3_CTL              \ Control register
+    8 +
+    CELL FIELD: TIMER3_IMR              \ Interrupt mask register
+    CELL FIELD: TIMER3_RIS              \ Interrupt status register
+    CELL FIELD: TIMER3_MIS              \ Masked interrupt status reg
+    CELL FIELD: TIMER3_ICR              \ Interrupt clear register
+    CELL FIELD: TIMER3_TAILR            \ TimerA interval load register
+    CELL FIELD: TIMER3_TBILR            \ TimerB interval load register
+    CELL FIELD: TIMER3_TAMATCHR         \ TimerA match register
+    CELL FIELD: TIMER3_TBMATCHR         \ TimerB match register
+    CELL FIELD: TIMER3_TAPR             \ TimerA prescale register
+    CELL FIELD: TIMER3_TBPR             \ TimerB prescale register
+    CELL FIELD: TIMER3_TAPMR            \ TimerA prescale match register
+    CELL FIELD: TIMER3_TBPMR            \ TimerB prescale match register
+    CELL FIELD: TIMER3_TAR              \ TimerA register
+    CELL FIELD: TIMER3_TBR              \ TimerB register
+    CELL FIELD: TIMER3_TAV              \ GPTM Timer A Value
+    CELL FIELD: TIMER3_TBV              \ GPTM Timer B Value
+DROP
+
+
+\ ----------       Analog to Digital Converter (ADC)              -----------*/
+ADC_BASE
+    CELL FIELD: ADC_ACTSS            \ Active sample register
+    CELL FIELD: ADC_RIS              \ Raw interrupt status register
+    CELL FIELD: ADC_IM               \ Interrupt mask register
+    CELL FIELD: ADC_ISC              \ Interrupt status/clear register
+    CELL FIELD: ADC_OSTAT            \ Overflow status register
+    CELL FIELD: ADC_EMUX             \ Event multiplexer select reg
+    CELL FIELD: ADC_USTAT            \ Underflow status register
+    4 +
+    CELL FIELD: ADC_SSPRI            \ Channel priority register
+    4 +
+    CELL FIELD: ADC_PSSI             \ Processor sample initiate reg
+    4 +
+    CELL FIELD: ADC_SAC              \ Sample Averaging Control reg
+    CELL FIELD: ADC_DCISC            \ ADC Digital Comparator Interrupt Status and Clear
+    CELL FIELD: ADC_CTL              \ ADC Control
+    4 +
+    CELL FIELD: ADC_SSMUX0           \ Multiplexer select 0 register
+    CELL FIELD: ADC_SSCTL0           \ Sample sequence control 0 reg
+    CELL FIELD: ADC_SSFIFO0          \ Result FIFO 0 register
+    CELL FIELD: ADC_SSFSTAT0         \ FIFO 0 status register
+    CELL FIELD: ADC_SSOP0            \ ADC Sample Sequence 0 Operation
+    CELL FIELD: ADC_SSDC0            \ ADC Sample Sequence 0 Digital Comparator Select
+    8 +
+    CELL FIELD: ADC_SSMUX1           \ Multiplexer select 1 register
+    CELL FIELD: ADC_SSCTL1           \ Sample sequence control 1 reg
+    CELL FIELD: ADC_SSFIFO1          \ Result FIFO 1 register
+    CELL FIELD: ADC_SSFSTAT1         \ FIFO 1 status register
+    CELL FIELD: ADC_SSOP1            \ ADC Sample Sequence 1 Operation
+    CELL FIELD: ADC_SSDC1            \ ADC Sample Sequence 1 Digital Comparator Select
+    8 +
+    CELL FIELD: ADC_SSMUX2           \ Multiplexer select 2 register
+    CELL FIELD: ADC_SSCTL2           \ Sample sequence control 2 reg
+    CELL FIELD: ADC_SSFIFO2          \ Result FIFO 2 register
+    CELL FIELD: ADC_SSFSTAT2         \ FIFO 2 status register
+    CELL FIELD: ADC_SSOP2            \ ADC Sample Sequence 2 Operation
+    CELL FIELD: ADC_SSDC2            \ ADC Sample Sequence 2 Digital Comparator Select
+    8 +
+    CELL FIELD: ADC_SSMUX3           \ Multiplexer select 3 register
+    CELL FIELD: ADC_SSCTL3           \ Sample sequence control 3 reg
+    CELL FIELD: ADC_SSFIFO3          \ Result FIFO 3 register
+    CELL FIELD: ADC_SSFSTAT3         \ FIFO 3 status register
+    CELL FIELD: ADC_SSOP3            \ ADC Sample Sequence 3 Operation
+    CELL FIELD: ADC_SSDC3            \ ADC Sample Sequence 3 Digital Comparator Select
+    72 +
+    CELL FIELD: ADC_TMLB             \ Test mode loopback register
+    3068 +
+    CELL FIELD: ADC_DCRIC            \ ADC Digital Comparator Reset Initial Conditions
+    252 +
+    CELL FIELD: ADC_DCCTL0           \ ADC Digital Comparator Control 0
+    CELL FIELD: ADC_DCCTL1           \ ADC Digital Comparator Control 1
+    CELL FIELD: ADC_DCCTL2           \ ADC Digital Comparator Control 2
+    CELL FIELD: ADC_DCCTL3           \ ADC Digital Comparator Control 3
+    CELL FIELD: ADC_DCCTL4           \ ADC Digital Comparator Control 4
+    CELL FIELD: ADC_DCCTL5           \ ADC Digital Comparator Control 5
+    CELL FIELD: ADC_DCCTL6           \ ADC Digital Comparator Control 6
+    CELL FIELD: ADC_DCCTL7           \ ADC Digital Comparator Control 7
+    32 +
+    CELL FIELD: ADC_DCCMP0           \ ADC Digital Comparator Range 0
+    CELL FIELD: ADC_DCCMP1           \ ADC Digital Comparator Range 1
+    CELL FIELD: ADC_DCCMP2           \ ADC Digital Comparator Range 2
+    CELL FIELD: ADC_DCCMP3           \ ADC Digital Comparator Range 3
+    CELL FIELD: ADC_DCCMP4           \ ADC Digital Comparator Range 4
+    CELL FIELD: ADC_DCCMP5           \ ADC Digital Comparator Range 5
+    CELL FIELD: ADC_DCCMP6           \ ADC Digital Comparator Range 6
+    CELL FIELD: ADC_DCCMP7           \ ADC Digital Comparator Range 7
+DROP
+
+
+\ ----------       Analog Comparators (COMP)                      -----------*/
+COMP_BASE
+    CELL FIELD: COMP_ACMIS            \ Analog Comparator Masked Interrupt Status
+    CELL FIELD: COMP_ACRIS            \ Analog Comparator Raw Interrupt Status
+    CELL FIELD: COMP_ACINTEN          \ Analog Comparator Interrupt Enable
+    4 +
+    CELL FIELD: COMP_ACREFCTL         \ Analog Comparator Reference Voltage Control
+    12 +
+    CELL FIELD: COMP_ACSTAT0          \ Comp0 status register
+    CELL FIELD: COMP_ACCTL0           \ Comp0 control register
+    24 +
+    CELL FIELD: COMP_ACSTAT1          \ Comp1 status register
+    CELL FIELD: COMP_ACCTL1           \ Comp1 control register
+    24 +
+    CELL FIELD: COMP_ACSTAT2          \ Comp2 status register
+    CELL FIELD: COMP_ACCTL2           \ Comp2 control register
+DROP
+
+\ ----------       Controller Area Network (CAN)                  -----------*/
+CAN0_BASE
+    CELL FIELD: CAN0_CTL              \ Control register
+    CELL FIELD: CAN0_STS              \ Status register
+    CELL FIELD: CAN0_ERR              \ Error register
+    CELL FIELD: CAN0_BIT              \ Bit Timing register
+    CELL FIELD: CAN0_INT              \ Interrupt register
+    CELL FIELD: CAN0_TST              \ Test register
+    CELL FIELD: CAN0_BRPE             \ Baud Rate Prescaler register
+    4 +
+    CELL FIELD: CAN0_IF1CRQ           \ Interface 1 Command Request reg
+    CELL FIELD: CAN0_IF1CMSK          \ Interface 1 Command Mask reg
+    CELL FIELD: CAN0_IF1MSK1          \ Interface 1 Mask 1 register
+    CELL FIELD: CAN0_IF1MSK2          \ Interface 1 Mask 2 register
+    CELL FIELD: CAN0_IF1ARB1          \ Interface 1 Arbitration 1 reg
+    CELL FIELD: CAN0_IF1ARB2          \ Interface 1 Arbitration 2 reg
+    CELL FIELD: CAN0_IF1MCTL          \ Interface 1 Message Control reg
+    CELL FIELD: CAN0_IF1DA1           \ Interface 1 DataA 1 register
+    CELL FIELD: CAN0_IF1DA2           \ Interface 1 DataA 2 register
+    CELL FIELD: CAN0_IF1DB1           \ Interface 1 DataB 1 register
+    CELL FIELD: CAN0_IF1DB2           \ Interface 1 DataB 2 register
+    52 +
+    CELL FIELD: CAN0_IF2CRQ           \ Interface 2 Command Request reg
+    CELL FIELD: CAN0_IF2CMSK          \ Interface 2 Command Mask reg
+    CELL FIELD: CAN0_IF2MSK1          \ Interface 2 Mask 1 register
+    CELL FIELD: CAN0_IF2MSK2          \ Interface 2 Mask 2 register
+    CELL FIELD: CAN0_IF2ARB1          \ Interface 2 Arbitration 1 reg
+    CELL FIELD: CAN0_IF2ARB2          \ Interface 2 Arbitration 2 reg
+    CELL FIELD: CAN0_IF2MCTL          \ Interface 2 Message Control reg
+    CELL FIELD: CAN0_IF2DA1           \ Interface 2 DataA 1 register
+    CELL FIELD: CAN0_IF2DA2           \ Interface 2 DataA 2 register
+    CELL FIELD: CAN0_IF2DB1           \ Interface 2 DataB 1 register
+    CELL FIELD: CAN0_IF2DB2           \ Interface 2 DataB 2 register
+    84 +
+    CELL FIELD: CAN0_TXRQ1            \ Transmission Request 1 register
+    CELL FIELD: CAN0_TXRQ2            \ Transmission Request 2 register
+    24 +
+    CELL FIELD: CAN0_NWDA1            \ New Data 1 register
+    CELL FIELD: CAN0_NWDA2            \ New Data 2 register
+    24 +
+    CELL FIELD: CAN0_MSG1INT          \ CAN Message 1 Interrupt Pending
+    CELL FIELD: CAN0_MSG2INT          \ CAN Message 2 Interrupt Pending
+    24 +
+    CELL FIELD: CAN0_MSG1VAL          \ CAN Message 1 Valid
+    CELL FIELD: CAN0_MSG2VAL          \ CAN Message 2 Valid
+DROP
+
+CAN1_BASE
+    CELL FIELD: CAN1_CTL              \ Control register
+    CELL FIELD: CAN1_STS              \ Status register
+    CELL FIELD: CAN1_ERR              \ Error register
+    CELL FIELD: CAN1_BIT              \ Bit Timing register
+    CELL FIELD: CAN1_INT              \ Interrupt register
+    CELL FIELD: CAN1_TST              \ Test register
+    CELL FIELD: CAN1_BRPE             \ Baud Rate Prescaler register
+    4 +
+    CELL FIELD: CAN1_IF1CRQ           \ Interface 1 Command Request reg
+    CELL FIELD: CAN1_IF1CMSK          \ Interface 1 Command Mask reg
+    CELL FIELD: CAN1_IF1MSK1          \ Interface 1 Mask 1 register
+    CELL FIELD: CAN1_IF1MSK2          \ Interface 1 Mask 2 register
+    CELL FIELD: CAN1_IF1ARB1          \ Interface 1 Arbitration 1 reg
+    CELL FIELD: CAN1_IF1ARB2          \ Interface 1 Arbitration 2 reg
+    CELL FIELD: CAN1_IF1MCTL          \ Interface 1 Message Control reg
+    CELL FIELD: CAN1_IF1DA1           \ Interface 1 DataA 1 register
+    CELL FIELD: CAN1_IF1DA2           \ Interface 1 DataA 2 register
+    CELL FIELD: CAN1_IF1DB1           \ Interface 1 DataB 1 register
+    CELL FIELD: CAN1_IF1DB2           \ Interface 1 DataB 2 register
+    52 +
+    CELL FIELD: CAN1_IF2CRQ           \ Interface 2 Command Request reg
+    CELL FIELD: CAN1_IF2CMSK          \ Interface 2 Command Mask reg
+    CELL FIELD: CAN1_IF2MSK1          \ Interface 2 Mask 1 register
+    CELL FIELD: CAN1_IF2MSK2          \ Interface 2 Mask 2 register
+    CELL FIELD: CAN1_IF2ARB1          \ Interface 2 Arbitration 1 reg
+    CELL FIELD: CAN1_IF2ARB2          \ Interface 2 Arbitration 2 reg
+    CELL FIELD: CAN1_IF2MCTL          \ Interface 2 Message Control reg
+    CELL FIELD: CAN1_IF2DA1           \ Interface 2 DataA 1 register
+    CELL FIELD: CAN1_IF2DA2           \ Interface 2 DataA 2 register
+    CELL FIELD: CAN1_IF2DB1           \ Interface 2 DataB 1 register
+    CELL FIELD: CAN1_IF2DB2           \ Interface 2 DataB 2 register
+    84 +
+    CELL FIELD: CAN1_TXRQ1            \ Transmission Request 1 register
+    CELL FIELD: CAN1_TXRQ2            \ Transmission Request 2 register
+    24 +
+    CELL FIELD: CAN1_NWDA1            \ New Data 1 register
+    CELL FIELD: CAN1_NWDA2            \ New Data 2 register
+    24 +
+    CELL FIELD: CAN1_MSG1INT          \ CAN Message 1 Interrupt Pending
+    CELL FIELD: CAN1_MSG2INT          \ CAN Message 2 Interrupt Pending
+    24 +
+    CELL FIELD: CAN1_MSG1VAL          \ CAN Message 1 Valid
+    CELL FIELD: CAN1_MSG2VAL          \ CAN Message 2 Valid
+DROP
+
+CAN2_BASE
+    CELL FIELD: CAN2_CTL              \ Control register
+    CELL FIELD: CAN2_STS              \ Status register
+    CELL FIELD: CAN2_ERR              \ Error register
+    CELL FIELD: CAN2_BIT              \ Bit Timing register
+    CELL FIELD: CAN2_INT              \ Interrupt register
+    CELL FIELD: CAN2_TST              \ Test register
+    CELL FIELD: CAN2_BRPE             \ Baud Rate Prescaler register
+    4 +
+    CELL FIELD: CAN2_IF1CRQ           \ Interface 1 Command Request reg
+    CELL FIELD: CAN2_IF1CMSK          \ Interface 1 Command Mask reg
+    CELL FIELD: CAN2_IF1MSK1          \ Interface 1 Mask 1 register
+    CELL FIELD: CAN2_IF1MSK2          \ Interface 1 Mask 2 register
+    CELL FIELD: CAN2_IF1ARB1          \ Interface 1 Arbitration 1 reg
+    CELL FIELD: CAN2_IF1ARB2          \ Interface 1 Arbitration 2 reg
+    CELL FIELD: CAN2_IF1MCTL          \ Interface 1 Message Control reg
+    CELL FIELD: CAN2_IF1DA1           \ Interface 1 DataA 1 register
+    CELL FIELD: CAN2_IF1DA2           \ Interface 1 DataA 2 register
+    CELL FIELD: CAN2_IF1DB1           \ Interface 1 DataB 1 register
+    CELL FIELD: CAN2_IF1DB2           \ Interface 1 DataB 2 register
+    52 +
+    CELL FIELD: CAN2_IF2CRQ           \ Interface 2 Command Request reg
+    CELL FIELD: CAN2_IF2CMSK          \ Interface 2 Command Mask reg
+    CELL FIELD: CAN2_IF2MSK1          \ Interface 2 Mask 1 register
+    CELL FIELD: CAN2_IF2MSK2          \ Interface 2 Mask 2 register
+    CELL FIELD: CAN2_IF2ARB1          \ Interface 2 Arbitration 1 reg
+    CELL FIELD: CAN2_IF2ARB2          \ Interface 2 Arbitration 2 reg
+    CELL FIELD: CAN2_IF2MCTL          \ Interface 2 Message Control reg
+    CELL FIELD: CAN2_IF2DA1           \ Interface 2 DataA 1 register
+    CELL FIELD: CAN2_IF2DA2           \ Interface 2 DataA 2 register
+    CELL FIELD: CAN2_IF2DB1           \ Interface 2 DataB 1 register
+    CELL FIELD: CAN2_IF2DB2           \ Interface 2 DataB 2 register
+    84 +
+    CELL FIELD: CAN2_TXRQ1            \ Transmission Request 1 register
+    CELL FIELD: CAN2_TXRQ2            \ Transmission Request 2 register
+    24 +
+    CELL FIELD: CAN2_NWDA1            \ New Data 1 register
+    CELL FIELD: CAN2_NWDA2            \ New Data 2 register
+    24 +
+    CELL FIELD: CAN2_MSG1INT          \ CAN Message 1 Interrupt Pending
+    CELL FIELD: CAN2_MSG2INT          \ CAN Message 2 Interrupt Pending
+    24 +
+    CELL FIELD: CAN2_MSG1VAL          \ CAN Message 1 Valid
+    CELL FIELD: CAN2_MSG2VAL          \ CAN Message 2 Valid
+DROP
+
+
+\ ----------       Ethernet Controller (MAC)                      -----------*/
+ETH_BASE
+    CELL FIELD: ETH_RIS              \ (   ) Ethernet MAC Raw Interrupt Status
+    ETH_RIS EQU ETH_IACK             \ (   )Interrupt Acknowledge Register
+    CELL FIELD: ETH_IM               \ Interrupt Mask Register
+    CELL FIELD: ETH_RCTL             \ Receive Control Register
+    CELL FIELD: ETH_TCTL             \ Transmit Control Register
+    CELL FIELD: ETH_DATA             \ Data Register
+    CELL FIELD: ETH_IA0              \ Individual Address Register 0
+    CELL FIELD: ETH_IA1              \ Individual Address Register 1
+    CELL FIELD: ETH_THR              \ Threshold Register
+    CELL FIELD: ETH_MCTL             \ Management Control Register
+    CELL FIELD: ETH_MDV              \ Management Divider Register
+    4 +
+    CELL FIELD: ETH_MTXD             \ Management Transmit Data Reg
+    CELL FIELD: ETH_MRXD             \ Management Receive Data Reg
+    CELL FIELD: ETH_NP               \ Number of Packets Register
+    CELL FIELD: ETH_TR               \ Transmission Request Register
+    CELL FIELD: ETH_TS               \ Timer Support Register
+    CELL FIELD: ETH_LED              \ Ethernet MAC LED Encoding
+    CELL FIELD: ETH_MDIX             \ MDIX Register
+DROP
+
+
+\ ----------       Flash Memory Controller (FLASH)                -----------*/
+FLASH_CTRL_BASE
+    CELL FIELD: FLASH_CTRL_FMA              \ Memory address register
+    CELL FIELD: FLASH_CTRL_FMD              \ Memory data register
+    CELL FIELD: FLASH_CTRL_FMC              \ Memory control register
+    CELL FIELD: FLASH_CTRL_FCRIS            \ Raw interrupt status register
+    CELL FIELD: FLASH_CTRL_FCIM             \ Interrupt mask register
+    CELL FIELD: FLASH_CTRL_FCMISC           \ Interrupt status register
+    8 +
+    CELL FIELD: FLASH_CTRL_FMC2             \ Flash Memory Control 2
+    12 +
+    CELL FIELD: FLASH_CTRL_FWBVAL           \ Flash Write Buffer Valid
+    204 +
+    CELL FIELD: FLASH_CTRL_FWBN             \ Flash Write Buffer Register n
+    4076 +
+    CELL FIELD: FLASH_CTRL_RMCTL            \ ROM Control
+    CELL FIELD: FLASH_CTRL_RMVER            \ ROM Version Register
+    56 +
+    CELL FIELD: FLASH_CTRL_FMPRE            \ FLASH read protect register
+    CELL FIELD: FLASH_CTRL_FMPPE            \ FLASH program protect register
+    8 +
+    CELL FIELD: FLASH_CTRL_USECRL           \ uSec reload register
+    140 +
+    CELL FIELD: FLASH_CTRL_USERDBG          \ User Debug
+    12 +
+    CELL FIELD: FLASH_CTRL_USERREG0         \ User Register 0
+    CELL FIELD: FLASH_CTRL_USERREG1         \ User Register 1
+    CELL FIELD: FLASH_CTRL_USERREG2         \ User Register 2
+    CELL FIELD: FLASH_CTRL_USERREG3         \ User Register 3
+    16 +
+    CELL FIELD: FLASH_CTRL_FMPRE0           \ FLASH read protect register 0
+    CELL FIELD: FLASH_CTRL_FMPRE1           \ FLASH read protect register 1
+    CELL FIELD: FLASH_CTRL_FMPRE2           \ FLASH read protect register 2
+    CELL FIELD: FLASH_CTRL_FMPRE3           \ FLASH read protect register 3
+    496 +
+    CELL FIELD: FLASH_CTRL_FMPPE0           \ FLASH program protect register 0
+    CELL FIELD: FLASH_CTRL_FMPPE1           \ FLASH program protect register 1
+    CELL FIELD: FLASH_CTRL_FMPPE2           \ FLASH program protect register 2
+    CELL FIELD: FLASH_CTRL_FMPPE3           \ FLASH program protect register 3
+DROP
+
+
+\ ----------       Hibernation Module (HIB)                       -----------*/
+HIB_BASE
+    CELL FIELD: HIB_RTCC             \ Hibernate RTC counter
+    CELL FIELD: HIB_RTCM0            \ Hibernate RTC match 0
+    CELL FIELD: HIB_RTCM1            \ Hibernate RTC match 1
+    CELL FIELD: HIB_RTCLD            \ Hibernate RTC load
+    CELL FIELD: HIB_CTL              \ Hibernate RTC control
+    CELL FIELD: HIB_IM               \ Hibernate interrupt mask
+    CELL FIELD: HIB_RIS              \ Hibernate raw interrupt status
+    CELL FIELD: HIB_MIS              \ Hibernate masked interrupt stat
+    CELL FIELD: HIB_IC               \ Hibernate interrupt clear
+    CELL FIELD: HIB_RTCT             \ Hibernate RTC trim
+    8 +
+    64 CHARS FIELD: HIB_DATA         \ Hibernate data area
+DROP
+
+
+\ -------- Inter-Integrated Circuit Controller Master (I2C_MASTER) ----------*/
+I2C0_MASTER_BASE
+    CELL FIELD: I2C0_MASTER_MSA              \ I2C Master Slave Address
+    CELL FIELD: I2C0_MASTER_MCS              \ I2C Master Control/Status
+    CELL FIELD: I2C0_MASTER_MDR              \ I2C Master Data
+    CELL FIELD: I2C0_MASTER_MTPR             \ I2C Master Timer Period
+    CELL FIELD: I2C0_MASTER_MIMR             \ I2C Master Interrupt Mask
+    CELL FIELD: I2C0_MASTER_MRIS             \ I2C Master Raw Interrupt Status
+    CELL FIELD: I2C0_MASTER_MMIS             \ I2C Master Masked Interrupt Status
+    CELL FIELD: I2C0_MASTER_MICR             \ I2C Master Interrupt Clear
+    CELL FIELD: I2C0_MASTER_MCR              \ I2C Master Configuration
+DROP
+
+I2C1_MASTER_BASE
+    CELL FIELD: I2C1_MASTER_MSA              \ I2C Master Slave Address
+    CELL FIELD: I2C1_MASTER_MCS              \ I2C Master Control/Status
+    CELL FIELD: I2C1_MASTER_MDR              \ I2C Master Data
+    CELL FIELD: I2C1_MASTER_MTPR             \ I2C Master Timer Period
+    CELL FIELD: I2C1_MASTER_MIMR             \ I2C Master Interrupt Mask
+    CELL FIELD: I2C1_MASTER_MRIS             \ I2C Master Raw Interrupt Status
+    CELL FIELD: I2C1_MASTER_MMIS             \ I2C Master Masked Interrupt Status
+    CELL FIELD: I2C1_MASTER_MICR             \ I2C Master Interrupt Clear
+    CELL FIELD: I2C1_MASTER_MCR              \ I2C Master Configuration
+DROP
+
+\ --------- Inter-Integrated Circuit Controller Slave (I2C_SLAVE) -----------*/
+I2C0_SLAVE_BASE
+    CELL FIELD: I2C0_SLAVE_SOAR             \ I2C Slave Own Address
+    CELL FIELD: I2C0_SLAVE_SCSR             \ I2C Slave Control/Status
+    CELL FIELD: I2C0_SLAVE_SDR              \ I2C Slave Data
+    CELL FIELD: I2C0_SLAVE_SIMR             \ I2C Slave Interrupt Mask
+    CELL FIELD: I2C0_SLAVE_SRIS             \ I2C Slave Raw Interrupt Status
+    CELL FIELD: I2C0_SLAVE_SMIS             \ I2C Slave Masked Interrupt Status
+    CELL FIELD: I2C0_SLAVE_SICR             \ I2C Slave Interrupt Clear
+DROP
+
+I2C1_SLAVE_BASE
+    CELL FIELD: I2C1_SLAVE_SOAR             \ I2C Slave Own Address
+    CELL FIELD: I2C1_SLAVE_SCSR             \ I2C Slave Control/Status
+    CELL FIELD: I2C1_SLAVE_SDR              \ I2C Slave Data
+    CELL FIELD: I2C1_SLAVE_SIMR             \ I2C Slave Interrupt Mask
+    CELL FIELD: I2C1_SLAVE_SRIS             \ I2C Slave Raw Interrupt Status
+    CELL FIELD: I2C1_SLAVE_SMIS             \ I2C Slave Masked Interrupt Status
+    CELL FIELD: I2C1_SLAVE_SICR             \ I2C Slave Interrupt Clear
+DROP
+
+
+\ ----------       Pulse Width Modulation (PWM)                   -----------*/
+PWM_BASE
+    CELL FIELD: PWM_CTL              \ PWM Master Control register
+    CELL FIELD: PWM_SYNC             \ PWM Time Base Sync register
+    CELL FIELD: PWM_ENABLE           \ PWM Output Enable register
+    CELL FIELD: PWM_INVERT           \ PWM Output Inversion register
+    CELL FIELD: PWM_FAULT            \ PWM Output Fault register
+    CELL FIELD: PWM_INTEN            \ PWM Interrupt Enable register
+    CELL FIELD: PWM_RIS              \ PWM Interrupt Raw Status reg
+    CELL FIELD: PWM_ISC              \ PWM Interrupt Status register
+    CELL FIELD: PWM_STATUS           \ PWM Status register
+    CELL FIELD: PWM_FAULTVAL         \ PWM Fault Condition Value
+    CELL FIELD: PWM_ENUPD            \ PWM Enable Update
+    20 +
+    CELL FIELD: PWM_GEN0_CTL            \ PWM0 Control
+    CELL FIELD: PWM_GEN0_INTEN          \ PWM0 Interrupt and Trigger Enable
+    CELL FIELD: PWM_GEN0_RIS            \ PWM0 Raw Interrupt Status
+    CELL FIELD: PWM_GEN0_ISC            \ PWM0 Interrupt Status and Clear
+    CELL FIELD: PWM_GEN0_LOAD           \ PWM0 Load
+    CELL FIELD: PWM_GEN0_COUNT          \ PWM0 Counter
+    CELL FIELD: PWM_GEN0_CMPA           \ PWM0 Compare A
+    CELL FIELD: PWM_GEN0_CMPB           \ PWM0 Compare B
+    CELL FIELD: PWM_GEN0_GENA           \ PWM0 Generator A Control
+    CELL FIELD: PWM_GEN0_GENB           \ PWM0 Generator B Control
+    CELL FIELD: PWM_GEN0_DBCTL          \ PWM0 Dead-Band Control
+    CELL FIELD: PWM_GEN0_DBRISE         \ PWM0 Dead-Band Rising-Edge Delay
+    CELL FIELD: PWM_GEN0_DBFALL         \ PWM0 Dead-Band Falling-Edge-Delay
+    CELL FIELD: PWM_GEN0_FLTSRC0        \ PWM0 Fault Source 0
+    CELL FIELD: PWM_GEN0_FLTSRC1        \ PWM0 Fault Source 1
+    CELL FIELD: PWM_GEN0_MINFLTPER      \ PWM0 Minimum Fault Period
+    CELL FIELD: PWM_GEN1_CTL            \ PWM1 Control
+    CELL FIELD: PWM_GEN1_INTEN          \ PWM1 Interrupt Enable
+    CELL FIELD: PWM_GEN1_RIS            \ PWM1 Raw Interrupt Status
+    CELL FIELD: PWM_GEN1_ISC            \ PWM1 Interrupt Status and Clear
+    CELL FIELD: PWM_GEN1_LOAD           \ PWM1 Load
+    CELL FIELD: PWM_GEN1_COUNT          \ PWM1 Counter
+    CELL FIELD: PWM_GEN1_CMPA           \ PWM1 Compare A
+    CELL FIELD: PWM_GEN1_CMPB           \ PWM1 Compare B
+    CELL FIELD: PWM_GEN1_GENA           \ PWM1 Generator A Control
+    CELL FIELD: PWM_GEN1_GENB           \ PWM1 Generator B Control
+    CELL FIELD: PWM_GEN1_DBCTL          \ PWM1 Dead-Band Control
+    CELL FIELD: PWM_GEN1_DBRISE         \ PWM1 Dead-Band Rising-Edge Delay
+    CELL FIELD: PWM_GEN1_DBFALL         \ PWM1 Dead-Band Falling-Edge-Delay
+    CELL FIELD: PWM_GEN1_FLTSRC0        \ PWM1 Fault Source 0
+    CELL FIELD: PWM_GEN1_FLTSRC1        \ PWM1 Fault Source 1
+    CELL FIELD: PWM_GEN1_MINFLTPER      \ PWM1 Minimum Fault Period
+    CELL FIELD: PWM_GEN2_CTL            \ PWM2 Control
+    CELL FIELD: PWM_GEN2_INTEN          \ PWM2 InterruptEnable
+    CELL FIELD: PWM_GEN2_RIS            \ PWM2 Raw Interrupt Status
+    CELL FIELD: PWM_GEN2_ISC            \ PWM2 Interrupt Status and Clear
+    CELL FIELD: PWM_GEN2_LOAD           \ PWM2 Load
+    CELL FIELD: PWM_GEN2_COUNT          \ PWM2 Counter
+    CELL FIELD: PWM_GEN2_CMPA           \ PWM2 Compare A
+    CELL FIELD: PWM_GEN2_CMPB           \ PWM2 Compare B
+    CELL FIELD: PWM_GEN2_GENA           \ PWM2 Generator A Control
+    CELL FIELD: PWM_GEN2_GENB           \ PWM2 Generator B Control
+    CELL FIELD: PWM_GEN2_DBCTL          \ PWM2 Dead-Band Control
+    CELL FIELD: PWM_GEN2_DBRISE         \ PWM2 Dead-Band Rising-Edge Delay
+    CELL FIELD: PWM_GEN2_DBFALL         \ PWM2 Dead-Band Falling-Edge-Delay
+    CELL FIELD: PWM_GEN2_FLTSRC0        \ PWM2 Fault Source 0
+    CELL FIELD: PWM_GEN2_FLTSRC1        \ PWM2 Fault Source 1
+    CELL FIELD: PWM_GEN2_MINFLTPER      \ PWM2 Minimum Fault Period
+    CELL FIELD: PWM_GEN3_CTL            \ PWM3 Control
+    CELL FIELD: PWM_GEN3_INTEN          \ PWM3 Interrupt and Trigger Enable
+    CELL FIELD: PWM_GEN3_RIS            \ PWM3 Raw Interrupt Status
+    CELL FIELD: PWM_GEN3_ISC            \ PWM3 Interrupt Status and Clear
+    CELL FIELD: PWM_GEN3_LOAD           \ PWM3 Load
+    CELL FIELD: PWM_GEN3_COUNT          \ PWM3 Counter
+    CELL FIELD: PWM_GEN3_CMPA           \ PWM3 Compare A
+    CELL FIELD: PWM_GEN3_CMPB           \ PWM3 Compare B
+    CELL FIELD: PWM_GEN3_GENA           \ PWM3 Generator A Control
+    CELL FIELD: PWM_GEN3_GENB           \ PWM3 Generator B Control
+    CELL FIELD: PWM_GEN3_DBCTL          \ PWM3 Dead-Band Control
+    CELL FIELD: PWM_GEN3_DBRISE         \ PWM3 Dead-Band Rising-Edge Delay
+    CELL FIELD: PWM_GEN3_DBFALL         \ PWM3 Dead-Band Falling-Edge-Delay
+    CELL FIELD: PWM_GEN3_FLTSRC0        \ PWM3 Fault Source 0
+    CELL FIELD: PWM_GEN3_FLTSRC1        \ PWM3 Fault Source 1
+    CELL FIELD: PWM_GEN3_MINFLTPER      \ PWM3 Minimum Fault Period
+    1728 +
+    CELL FIELD: PWM_GEN0_FLTSEN         \ PWM0 Fault Pin Logic Sense
+    CELL FIELD: PWM_GEN0_FLTSTAT0       \ PWM0 Fault Status 0
+    CELL FIELD: PWM_GEN0_FLTSTAT1       \ PWM0 Fault Status 1
+    116 +
+    CELL FIELD: PWM_GEN1_FLTSEN         \ PWM1 Fault Pin Logic Sense
+    CELL FIELD: PWM_GEN1_FLTSTAT0       \ PWM1 Fault Status 0
+    CELL FIELD: PWM_GEN1_FLTSTAT1       \ PWM1 Fault Status 1
+    116 +
+    CELL FIELD: PWM_GEN2_FLTSEN         \ PWM2 Fault Pin Logic Sense
+    CELL FIELD: PWM_GEN2_FLTSTAT0       \ PWM2 Fault Status 0
+    CELL FIELD: PWM_GEN2_FLTSTAT1       \ PWM2 Fault Status 1
+    116 +
+    CELL FIELD: PWM_GEN3_FLTSEN         \ PWM3 Fault Pin Logic Sense
+    CELL FIELD: PWM_GEN3_FLTSTAT0       \ PWM3 Fault Status 0
+    CELL FIELD: PWM_GEN3_FLTSTAT1       \ PWM3 Fault Status 1
+DROP
+
+\ ----------       Pulse Width Modulation Generator (PWMGEN)      -----------*/
+PWM_BASE PWM_GEN_0_OFFSET +
+    CELL FIELD: PWM_GEN_0_CTL                 \ PWM0 Control
+    CELL FIELD: PWM_GEN_0_INTEN               \ PWM0 Interrupt and Trigger Enable
+    CELL FIELD: PWM_GEN_0_RIS                 \ PWM0 Raw Interrupt Status
+    CELL FIELD: PWM_GEN_0_ISC                 \ PWM0 Interrupt Status and Clear
+    CELL FIELD: PWM_GEN_0_LOAD                \ PWM0 Load
+    CELL FIELD: PWM_GEN_0_COUNT               \ PWM0 Counter
+    CELL FIELD: PWM_GEN_0_CMPA                \ PWM0 Compare A
+    CELL FIELD: PWM_GEN_0_CMPB                \ PWM0 Compare B
+    CELL FIELD: PWM_GEN_0_GENA                \ PWM0 Generator A Control
+    CELL FIELD: PWM_GEN_0_GENB                \ PWM0 Generator B Control
+    CELL FIELD: PWM_GEN_0_DBCTL               \ PWM0 Dead-Band Control
+    CELL FIELD: PWM_GEN_0_DBRISE              \ PWM0 Dead-Band Rising-Edge Delay
+    CELL FIELD: PWM_GEN_0_DBFALL              \ PWM0 Dead-Band Falling-Edge-Delay
+    CELL FIELD: PWM_GEN_0_FLTSRC0             \ PWM0 Fault Source 0
+    CELL FIELD: PWM_GEN_0_FLTSRC1             \ PWM0 Fault Source 1
+    CELL FIELD: PWM_GEN_0_MINFLTPER           \ PWM0 Minimum Fault Period
+    1920 +
+    CELL FIELD: PWM_GEN_0_FLTSEN              \ PWM0 Fault Pin Logic Sense
+    CELL FIELD: PWM_GEN_0_FLTSTAT0            \ PWM0 Fault Status 0
+    CELL FIELD: PWM_GEN_0_FLTSTAT1            \ PWM0 Fault Status 1
+DROP
+
+PWM_BASE PWM_GEN_1_OFFSET +
+    CELL FIELD: PWM_GEN_1_CTL                 \ PWM0 Control
+    CELL FIELD: PWM_GEN_1_INTEN               \ PWM0 Interrupt and Trigger Enable
+    CELL FIELD: PWM_GEN_1_RIS                 \ PWM0 Raw Interrupt Status
+    CELL FIELD: PWM_GEN_1_ISC                 \ PWM0 Interrupt Status and Clear
+    CELL FIELD: PWM_GEN_1_LOAD                \ PWM0 Load
+    CELL FIELD: PWM_GEN_1_COUNT               \ PWM0 Counter
+    CELL FIELD: PWM_GEN_1_CMPA                \ PWM0 Compare A
+    CELL FIELD: PWM_GEN_1_CMPB                \ PWM0 Compare B
+    CELL FIELD: PWM_GEN_1_GENA                \ PWM0 Generator A Control
+    CELL FIELD: PWM_GEN_1_GENB                \ PWM0 Generator B Control
+    CELL FIELD: PWM_GEN_1_DBCTL               \ PWM0 Dead-Band Control
+    CELL FIELD: PWM_GEN_1_DBRISE              \ PWM0 Dead-Band Rising-Edge Delay
+    CELL FIELD: PWM_GEN_1_DBFALL              \ PWM0 Dead-Band Falling-Edge-Delay
+    CELL FIELD: PWM_GEN_1_FLTSRC0             \ PWM0 Fault Source 0
+    CELL FIELD: PWM_GEN_1_FLTSRC1             \ PWM0 Fault Source 1
+    CELL FIELD: PWM_GEN_1_MINFLTPER           \ PWM0 Minimum Fault Period
+    1920 +
+    CELL FIELD: PWM_GEN_1_FLTSEN              \ PWM0 Fault Pin Logic Sense
+    CELL FIELD: PWM_GEN_1_FLTSTAT0            \ PWM0 Fault Status 0
+    CELL FIELD: PWM_GEN_1_FLTSTAT1            \ PWM0 Fault Status 1
+DROP
+
+PWM_BASE PWM_GEN_2_OFFSET +
+    CELL FIELD: PWM_GEN_2_CTL                 \ PWM0 Control
+    CELL FIELD: PWM_GEN_2_INTEN               \ PWM0 Interrupt and Trigger Enable
+    CELL FIELD: PWM_GEN_2_RIS                 \ PWM0 Raw Interrupt Status
+    CELL FIELD: PWM_GEN_2_ISC                 \ PWM0 Interrupt Status and Clear
+    CELL FIELD: PWM_GEN_2_LOAD                \ PWM0 Load
+    CELL FIELD: PWM_GEN_2_COUNT               \ PWM0 Counter
+    CELL FIELD: PWM_GEN_2_CMPA                \ PWM0 Compare A
+    CELL FIELD: PWM_GEN_2_CMPB                \ PWM0 Compare B
+    CELL FIELD: PWM_GEN_2_GENA                \ PWM0 Generator A Control
+    CELL FIELD: PWM_GEN_2_GENB                \ PWM0 Generator B Control
+    CELL FIELD: PWM_GEN_2_DBCTL               \ PWM0 Dead-Band Control
+    CELL FIELD: PWM_GEN_2_DBRISE              \ PWM0 Dead-Band Rising-Edge Delay
+    CELL FIELD: PWM_GEN_2_DBFALL              \ PWM0 Dead-Band Falling-Edge-Delay
+    CELL FIELD: PWM_GEN_2_FLTSRC0             \ PWM0 Fault Source 0
+    CELL FIELD: PWM_GEN_2_FLTSRC1             \ PWM0 Fault Source 1
+    CELL FIELD: PWM_GEN_2_MINFLTPER           \ PWM0 Minimum Fault Period
+    1920 +
+    CELL FIELD: PWM_GEN_2_FLTSEN              \ PWM0 Fault Pin Logic Sense
+    CELL FIELD: PWM_GEN_2_FLTSTAT0            \ PWM0 Fault Status 0
+    CELL FIELD: PWM_GEN_2_FLTSTAT1            \ PWM0 Fault Status 1
+DROP
+
+PWM_BASE PWM_GEN_3_OFFSET +
+    CELL FIELD: PWM_GEN_3_CTL                 \ PWM0 Control
+    CELL FIELD: PWM_GEN_3_INTEN               \ PWM0 Interrupt and Trigger Enable
+    CELL FIELD: PWM_GEN_3_RIS                 \ PWM0 Raw Interrupt Status
+    CELL FIELD: PWM_GEN_3_ISC                 \ PWM0 Interrupt Status and Clear
+    CELL FIELD: PWM_GEN_3_LOAD                \ PWM0 Load
+    CELL FIELD: PWM_GEN_3_COUNT               \ PWM0 Counter
+    CELL FIELD: PWM_GEN_3_CMPA                \ PWM0 Compare A
+    CELL FIELD: PWM_GEN_3_CMPB                \ PWM0 Compare B
+    CELL FIELD: PWM_GEN_3_GENA                \ PWM0 Generator A Control
+    CELL FIELD: PWM_GEN_3_GENB                \ PWM0 Generator B Control
+    CELL FIELD: PWM_GEN_3_DBCTL               \ PWM0 Dead-Band Control
+    CELL FIELD: PWM_GEN_3_DBRISE              \ PWM0 Dead-Band Rising-Edge Delay
+    CELL FIELD: PWM_GEN_3_DBFALL              \ PWM0 Dead-Band Falling-Edge-Delay
+    CELL FIELD: PWM_GEN_3_FLTSRC0             \ PWM0 Fault Source 0
+    CELL FIELD: PWM_GEN_3_FLTSRC1             \ PWM0 Fault Source 1
+    CELL FIELD: PWM_GEN_3_MINFLTPER           \ PWM0 Minimum Fault Period
+    1920 +
+    CELL FIELD: PWM_GEN_3_FLTSEN              \ PWM0 Fault Pin Logic Sense
+    CELL FIELD: PWM_GEN_3_FLTSTAT0            \ PWM0 Fault Status 0
+    CELL FIELD: PWM_GEN_3_FLTSTAT1            \ PWM0 Fault Status 1
+DROP
+
+
+\ ----------       Quadrature Encoded Input (QEI)                 -----------*/
+QEI0_BASE
+    CELL FIELD: QEI0_CTL                  \ Configuration and control reg
+    CELL FIELD: QEI0_STAT                 \ Status register
+    CELL FIELD: QEI0_POS                  \ Current position register
+    CELL FIELD: QEI0_MAXPOS               \ Maximum position register
+    CELL FIELD: QEI0_LOAD                 \ Velocity timer load register
+    CELL FIELD: QEI0_TIME                 \ Velocity timer register
+    CELL FIELD: QEI0_COUNT                \ Velocity pulse count register
+    CELL FIELD: QEI0_SPEED                \ Velocity speed register
+    CELL FIELD: QEI0_INTEN                \ Interrupt enable register
+    CELL FIELD: QEI0_RIS                  \ Raw interrupt status register
+    CELL FIELD: QEI0_ISC                  \ Interrupt status register
+DROP
+
+QEI1_BASE
+    CELL FIELD: QEI1_CTL                  \ Configuration and control reg
+    CELL FIELD: QEI1_STAT                 \ Status register
+    CELL FIELD: QEI1_POS                  \ Current position register
+    CELL FIELD: QEI1_MAXPOS               \ Maximum position register
+    CELL FIELD: QEI1_LOAD                 \ Velocity timer load register
+    CELL FIELD: QEI1_TIME                 \ Velocity timer register
+    CELL FIELD: QEI1_COUNT                \ Velocity pulse count register
+    CELL FIELD: QEI1_SPEED                \ Velocity speed register
+    CELL FIELD: QEI1_INTEN                \ Interrupt enable register
+    CELL FIELD: QEI1_RIS                  \ Raw interrupt status register
+    CELL FIELD: QEI1_ISC                  \ Interrupt status register
+DROP
+
+
+\ ----------       Synchronous Serial Interface (SSI)             -----------*/
+SSI0_BASE
+    CELL FIELD: SSI0_CR0              \ Control register 0
+    CELL FIELD: SSI0_CR1              \ Control register 1
+    CELL FIELD: SSI0_DR               \ Data register
+    CELL FIELD: SSI0_SR               \ Status register
+    CELL FIELD: SSI0_CPSR             \ Clock prescale register
+    CELL FIELD: SSI0_IM               \ Int mask set and clear register
+    CELL FIELD: SSI0_RIS              \ Raw interrupt register
+    CELL FIELD: SSI0_MIS              \ Masked interrupt register
+    CELL FIELD: SSI0_ICR              \ Interrupt clear register
+    CELL FIELD: SSI0_DMACTL           \ SSI DMA Control
+DROP
+
+SSI1_BASE
+    CELL FIELD: SSI1_CR0              \ Control register 0
+    CELL FIELD: SSI1_CR1              \ Control register 1
+    CELL FIELD: SSI1_DR               \ Data register
+    CELL FIELD: SSI1_SR               \ Status register
+    CELL FIELD: SSI1_CPSR             \ Clock prescale register
+    CELL FIELD: SSI1_IM               \ Int mask set and clear register
+    CELL FIELD: SSI1_RIS              \ Raw interrupt register
+    CELL FIELD: SSI1_MIS              \ Masked interrupt register
+    CELL FIELD: SSI1_ICR              \ Interrupt clear register
+    CELL FIELD: SSI1_DMACTL           \ SSI DMA Control
+DROP
+
+
+\ ----------       Asynchronous Serial (UART)                     -----------*/
+UART0_BASE
+    CELL FIELD: UART0_DR               \ Data Register
+    CELL FIELD: UART0_RSR              \ Receive Status Register (read)
+    UART0_RSR EQU UART0_ECR            \ Error Clear Register (write)
+    16 +
+    CELL FIELD: UART0_FR               \ Flag Register (read only)
+    4 +
+    CELL FIELD: UART0_ILPR             \ UART IrDA Low-Power Register
+    CELL FIELD: UART0_IBRD             \ Integer Baud Rate Divisor Reg
+    CELL FIELD: UART0_FBRD             \ Fractional Baud Rate Divisor Reg
+    CELL FIELD: UART0_LCRH             \ UART Line Control
+    CELL FIELD: UART0_CTL              \ Control Register
+    CELL FIELD: UART0_IFLS             \ Interrupt FIFO Level Select Reg
+    CELL FIELD: UART0_IM               \ Interrupt Mask Set/Clear Reg
+    CELL FIELD: UART0_RIS              \ Raw Interrupt Status Register
+    CELL FIELD: UART0_MIS              \ Masked Interrupt Status Register
+    CELL FIELD: UART0_ICR              \ Interrupt Clear Register
+    CELL FIELD: UART0_DMACTL           \ UART DMA Control
+    68 +
+    CELL FIELD: UART0_LCTL             \ UART LIN Control
+    CELL FIELD: UART0_LSS              \ UART LIN Snap Shot
+    CELL FIELD: UART0_LTIM             \ UART LIN Timer
+DROP
+
+UART1_BASE
+    CELL FIELD: UART1_DR               \ Data Register
+    CELL FIELD: UART1_RSR              \ Receive Status Register (read)
+    UART1_RSR EQU UART1_ECR            \ Error Clear Register (write)
+    16 +
+    CELL FIELD: UART1_FR               \ Flag Register (read only)
+    4 +
+    CELL FIELD: UART1_ILPR             \ UART IrDA Low-Power Register
+    CELL FIELD: UART1_IBRD             \ Integer Baud Rate Divisor Reg
+    CELL FIELD: UART1_FBRD             \ Fractional Baud Rate Divisor Reg
+    CELL FIELD: UART1_LCRH             \ UART Line Control
+    CELL FIELD: UART1_CTL              \ Control Register
+    CELL FIELD: UART1_IFLS             \ Interrupt FIFO Level Select Reg
+    CELL FIELD: UART1_IM               \ Interrupt Mask Set/Clear Reg
+    CELL FIELD: UART1_RIS              \ Raw Interrupt Status Register
+    CELL FIELD: UART1_MIS              \ Masked Interrupt Status Register
+    CELL FIELD: UART1_ICR              \ Interrupt Clear Register
+    CELL FIELD: UART1_DMACTL           \ UART DMA Control
+    68 +
+    CELL FIELD: UART1_LCTL             \ UART LIN Control
+    CELL FIELD: UART1_LSS              \ UART LIN Snap Shot
+    CELL FIELD: UART1_LTIM             \ UART LIN Timer
+DROP
+
+UART2_BASE
+    CELL FIELD: UART2_DR               \ Data Register
+    CELL FIELD: UART2_RSR              \ Receive Status Register (read)
+    UART2_RSR EQU UART2_ECR            \ Error Clear Register (write)
+    16 +
+    CELL FIELD: UART2_FR               \ Flag Register (read only)
+    4 +
+    CELL FIELD: UART2_ILPR             \ UART IrDA Low-Power Register
+    CELL FIELD: UART2_IBRD             \ Integer Baud Rate Divisor Reg
+    CELL FIELD: UART2_FBRD             \ Fractional Baud Rate Divisor Reg
+    CELL FIELD: UART2_LCRH             \ UART Line Control
+    CELL FIELD: UART2_CTL              \ Control Register
+    CELL FIELD: UART2_IFLS             \ Interrupt FIFO Level Select Reg
+    CELL FIELD: UART2_IM               \ Interrupt Mask Set/Clear Reg
+    CELL FIELD: UART2_RIS              \ Raw Interrupt Status Register
+    CELL FIELD: UART2_MIS              \ Masked Interrupt Status Register
+    CELL FIELD: UART2_ICR              \ Interrupt Clear Register
+    CELL FIELD: UART2_DMACTL           \ UART DMA Control
+    68 +
+    CELL FIELD: UART2_LCTL             \ UART LIN Control
+    CELL FIELD: UART2_LSS              \ UART LIN Snap Shot
+    CELL FIELD: UART2_LTIM             \ UART LIN Timer
+DROP
+
+
+\ ----------       DMA Controller (UDMA)                          -----------*/
+UDMA_BASE
+    CELL FIELD: UDMA_STAT             \ DMA Status
+    CELL FIELD: UDMA_CFG              \ DMA Configuration
+    CELL FIELD: UDMA_CTLBASE          \ DMA Channel Control Base Pointer
+    CELL FIELD: UDMA_ALTBASE          \ DMA Alternate Channel Control Base Pointer
+    CELL FIELD: UDMA_WAITSTAT         \ DMA Channel Wait on Request Status
+    CELL FIELD: UDMA_SWREQ            \ DMA Channel Software Request
+    CELL FIELD: UDMA_USEBURSTSET      \ DMA Channel Useburst Set
+    CELL FIELD: UDMA_USEBURSTCLR      \ DMA Channel Useburst Clear
+    CELL FIELD: UDMA_REQMASKSET       \ DMA Channel Request Mask Set
+    CELL FIELD: UDMA_REQMASKCLR       \ DMA Channel Request Mask Clear
+    CELL FIELD: UDMA_ENASET           \ DMA Channel Enable Set
+    CELL FIELD: UDMA_ENACLR           \ DMA Channel Enable Clear
+    CELL FIELD: UDMA_ALTSET           \ DMA Channel Primary Alternate Set
+    CELL FIELD: UDMA_ALTCLR           \ DMA Channel Primary Alternate Clear
+    CELL FIELD: UDMA_PRIOSET          \ DMA Channel Priority Set
+    CELL FIELD: UDMA_PRIOCLR          \ DMA Channel Priority Clear
+    12 +
+    CELL FIELD: UDMA_ERRCLR           \ DMA Bus Error Clear
+    1200 +
+    CELL FIELD: UDMA_CHALT            \ DMA Channel Alternate Select
+DROP
+
+
+\ ----------       Universal Serial Bus Controller (USB)          -----------*/
+USB0_BASE
+    1 CHARS FIELD:  USB0_FADDR            \ USB Device Functional Address
+    1 CHARS FIELD:  USB0_POWER            \ USB Power
+    2 CHARS FIELD: USB0_TXIS             \ USB Transmit Interrupt Status
+    2 CHARS FIELD: USB0_RXIS             \ USB Receive Interrupt Status
+    2 CHARS FIELD: USB0_TXIE             \ USB Transmit Interrupt Enable
+    2 CHARS FIELD: USB0_RXIE             \ USB Receive Interrupt Enable
+    1 CHARS FIELD:  USB0_IS               \ USB General Interrupt Status
+    1 CHARS FIELD:  USB0_IE               \ USB Interrupt Enable
+    2 CHARS FIELD: USB0_FRAME            \ USB Frame Value
+    1 CHARS FIELD:  USB0_EPIDX            \ USB Endpoint Index
+    1 CHARS FIELD:  USB0_TEST             \ USB Test Mode
+    16 +
+    CELL FIELD: USB0_FIFO0            \ USB FIFO Endpoint 0
+    CELL FIELD: USB0_FIFO1            \ USB FIFO Endpoint 1
+    CELL FIELD: USB0_FIFO2            \ USB FIFO Endpoint 2
+    CELL FIELD: USB0_FIFO3            \ USB FIFO Endpoint 3
+    CELL FIELD: USB0_FIFO4            \ USB FIFO Endpoint 4
+    CELL FIELD: USB0_FIFO5            \ USB FIFO Endpoint 5
+    CELL FIELD: USB0_FIFO6            \ USB FIFO Endpoint 6
+    CELL FIELD: USB0_FIFO7            \ USB FIFO Endpoint 7
+    CELL FIELD: USB0_FIFO8            \ USB FIFO Endpoint 8
+    CELL FIELD: USB0_FIFO9            \ USB FIFO Endpoint 9
+    CELL FIELD: USB0_FIFO10           \ USB FIFO Endpoint 10
+    CELL FIELD: USB0_FIFO11           \ USB FIFO Endpoint 11
+    CELL FIELD: USB0_FIFO12           \ USB FIFO Endpoint 12
+    CELL FIELD: USB0_FIFO13           \ USB FIFO Endpoint 13
+    CELL FIELD: USB0_FIFO14           \ USB FIFO Endpoint 14
+    CELL FIELD: USB0_FIFO15           \ USB FIFO Endpoint 15
+    1 CHARS FIELD:  USB0_DEVCTL           \ USB Device Control
+    1 +
+    1 CHARS FIELD:  USB0_TXFIFOSZ         \ USB Transmit Dynamic FIFO Sizing
+    1 CHARS FIELD:  USB0_RXFIFOSZ         \ USB Receive Dynamic FIFO Sizing
+    2 CHARS FIELD: USB0_TXFIFOADD        \ USB Transmit FIFO Start Address
+    2 CHARS FIELD: USB0_RXFIFOADD        \ USB Receive FIFO Start Address
+    18 +
+    1 CHARS FIELD:  USB0_CONTIM           \ USB Connect Timing
+    1 CHARS FIELD:  USB0_VPLEN            \ USB OTG VBus Pulse Timing
+    1 +
+    1 CHARS FIELD:  USB0_FSEOF            \ USB Full-Speed Last Transaction to End
+                               \ of Frame Timing
+    1 CHARS FIELD:  USB0_LSEOF            \ USB Low-Speed Last Transaction to End of
+                               \ Frame Timing
+    1 +
+    1 CHARS FIELD:  USB0_TXFUNCADDR0      \ USB Transmit Functional Address
+                               \ Endpoint 0
+    1 +
+    1 CHARS FIELD:  USB0_TXHUBADDR0       \ USB Transmit Hub Address Endpoint 0
+    1 CHARS FIELD:  USB0_TXHUBPORT0       \ USB Transmit Hub Port Endpoint 0
+    4 +
+    1 CHARS FIELD:  USB0_TXFUNCADDR1      \ USB Transmit Functional Address
+                               \ Endpoint 1
+    1 +
+    1 CHARS FIELD:  USB0_TXHUBADDR1       \ USB Transmit Hub Address Endpoint 1
+    1 CHARS FIELD:  USB0_TXHUBPORT1       \ USB Transmit Hub Port Endpoint 1
+    1 CHARS FIELD:  USB0_RXFUNCADDR1      \ USB Receive Functional Address
+                               \ Endpoint 1
+    1 +
+    1 CHARS FIELD:  USB0_RXHUBADDR1       \ USB Receive Hub Address Endpoint 1
+    1 CHARS FIELD:  USB0_RXHUBPORT1       \ USB Receive Hub Port Endpoint 1
+    1 CHARS FIELD:  USB0_TXFUNCADDR2      \ USB Transmit Functional Address
+                               \ Endpoint 2
+    1 +
+    1 CHARS FIELD:  USB0_TXHUBADDR2       \ USB Transmit Hub Address Endpoint 2
+    1 CHARS FIELD:  USB0_TXHUBPORT2       \ USB Transmit Hub Port Endpoint 2
+    1 CHARS FIELD:  USB0_RXFUNCADDR2      \ USB Receive Functional Address
+                               \ Endpoint 2
+    1 +
+    1 CHARS FIELD:  USB0_RXHUBADDR2       \ USB Receive Hub Address Endpoint 2
+    1 CHARS FIELD:  USB0_RXHUBPORT2       \ USB Receive Hub Port Endpoint 2
+    1 CHARS FIELD:  USB0_TXFUNCADDR3      \ USB Transmit Functional Address
+                               \ Endpoint 3
+    1 +
+    1 CHARS FIELD:  USB0_TXHUBADDR3       \ USB Transmit Hub Address Endpoint 3
+    1 CHARS FIELD:  USB0_TXHUBPORT3       \ USB Transmit Hub Port Endpoint 3
+    1 CHARS FIELD:  USB0_RXFUNCADDR3      \ USB Receive Functional Address
+                               \ Endpoint 3
+    1 +
+    1 CHARS FIELD:  USB0_RXHUBADDR3       \ USB Receive Hub Address Endpoint 3
+    1 CHARS FIELD:  USB0_RXHUBPORT3       \ USB Receive Hub Port Endpoint 3
+    1 CHARS FIELD:  USB0_TXFUNCADDR4      \ USB Transmit Functional Address
+                               \ Endpoint 4
+    1 +
+    1 CHARS FIELD:  USB0_TXHUBADDR4       \ USB Transmit Hub Address Endpoint 4
+    1 CHARS FIELD:  USB0_TXHUBPORT4       \ USB Transmit Hub Port Endpoint 4
+    1 CHARS FIELD:  USB0_RXFUNCADDR4      \ USB Receive Functional Address
+                               \ Endpoint 4
+    1 +
+    1 CHARS FIELD:  USB0_RXHUBADDR4       \ USB Receive Hub Address Endpoint 4
+    1 CHARS FIELD:  USB0_RXHUBPORT4       \ USB Receive Hub Port Endpoint 4
+    1 CHARS FIELD:  USB0_TXFUNCADDR5      \ USB Transmit Functional Address
+                               \ Endpoint 5
+    1 +
+    1 CHARS FIELD:  USB0_TXHUBADDR5       \ USB Transmit Hub Address Endpoint 5
+    1 CHARS FIELD:  USB0_TXHUBPORT5       \ USB Transmit Hub Port Endpoint 5
+    1 CHARS FIELD:  USB0_RXFUNCADDR5      \ USB Receive Functional Address
+                               \ Endpoint 5
+    1 +
+    1 CHARS FIELD:  USB0_RXHUBADDR5       \ USB Receive Hub Address Endpoint 5
+    1 CHARS FIELD:  USB0_RXHUBPORT5       \ USB Receive Hub Port Endpoint 5
+    1 CHARS FIELD:  USB0_TXFUNCADDR6      \ USB Transmit Functional Address
+                               \ Endpoint 6
+    1 +
+    1 CHARS FIELD:  USB0_TXHUBADDR6       \ USB Transmit Hub Address Endpoint 6
+    1 CHARS FIELD:  USB0_TXHUBPORT6       \ USB Transmit Hub Port Endpoint 6
+    1 CHARS FIELD:  USB0_RXFUNCADDR6      \ USB Receive Functional Address
+                               \ Endpoint 6
+    1 +
+    1 CHARS FIELD:  USB0_RXHUBADDR6       \ USB Receive Hub Address Endpoint 6
+    1 CHARS FIELD:  USB0_RXHUBPORT6       \ USB Receive Hub Port Endpoint 6
+    1 CHARS FIELD:  USB0_TXFUNCADDR7      \ USB Transmit Functional Address
+                               \ Endpoint 7
+    1 +
+    1 CHARS FIELD:  USB0_TXHUBADDR7       \ USB Transmit Hub Address Endpoint 7
+    1 CHARS FIELD:  USB0_TXHUBPORT7       \ USB Transmit Hub Port Endpoint 7
+    1 CHARS FIELD:  USB0_RXFUNCADDR7      \ USB Receive Functional Address
+                               \ Endpoint 7
+    1 +
+    1 CHARS FIELD:  USB0_RXHUBADDR7       \ USB Receive Hub Address Endpoint 7
+    1 CHARS FIELD:  USB0_RXHUBPORT7       \ USB Receive Hub Port Endpoint 7
+    1 CHARS FIELD:  USB0_TXFUNCADDR8      \ USB Transmit Functional Address
+                               \ Endpoint 8
+    1 +
+    1 CHARS FIELD:  USB0_TXHUBADDR8       \ USB Transmit Hub Address Endpoint 8
+    1 CHARS FIELD:  USB0_TXHUBPORT8       \ USB Transmit Hub Port Endpoint 8
+    1 CHARS FIELD:  USB0_RXFUNCADDR8      \ USB Receive Functional Address
+                               \ Endpoint 8
+    1 +
+    1 CHARS FIELD:  USB0_RXHUBADDR8       \ USB Receive Hub Address Endpoint 8
+    1 CHARS FIELD:  USB0_RXHUBPORT8       \ USB Receive Hub Port Endpoint 8
+    1 CHARS FIELD:  USB0_TXFUNCADDR9      \ USB Transmit Functional Address
+                               \ Endpoint 9
+    1 +
+    1 CHARS FIELD:  USB0_TXHUBADDR9       \ USB Transmit Hub Address Endpoint 9
+    1 CHARS FIELD:  USB0_TXHUBPORT9       \ USB Transmit Hub Port Endpoint 9
+    1 CHARS FIELD:  USB0_RXFUNCADDR9      \ USB Receive Functional Address
+                               \ Endpoint 9
+    1 +
+    1 CHARS FIELD:  USB0_RXHUBADDR9       \ USB Receive Hub Address Endpoint 9
+    1 CHARS FIELD:  USB0_RXHUBPORT9       \ USB Receive Hub Port Endpoint 9
+    1 CHARS FIELD:  USB0_TXFUNCADDR10     \ USB Transmit Functional Address
+                               \ Endpoint 10
+    1 +
+    1 CHARS FIELD:  USB0_TXHUBADDR10      \ USB Transmit Hub Address Endpoint 10
+    1 CHARS FIELD:  USB0_TXHUBPORT10      \ USB Transmit Hub Port Endpoint 10
+    1 CHARS FIELD:  USB0_RXFUNCADDR10     \ USB Receive Functional Address
+                               \ Endpoint 10
+    1 +
+    1 CHARS FIELD:  USB0_RXHUBADDR10      \ USB Receive Hub Address Endpoint 10
+    1 CHARS FIELD:  USB0_RXHUBPORT10      \ USB Receive Hub Port Endpoint 10
+    1 CHARS FIELD:  USB0_TXFUNCADDR11     \ USB Transmit Functional Address
+                               \ Endpoint 11
+    1 +
+    1 CHARS FIELD:  USB0_TXHUBADDR11      \ USB Transmit Hub Address Endpoint 11
+    1 CHARS FIELD:  USB0_TXHUBPORT11      \ USB Transmit Hub Port Endpoint 11
+    1 CHARS FIELD:  USB0_RXFUNCADDR11     \ USB Receive Functional Address
+                               \ Endpoint 11
+    1 +
+    1 CHARS FIELD:  USB0_RXHUBADDR11      \ USB Receive Hub Address Endpoint 11
+    1 CHARS FIELD:  USB0_RXHUBPORT11      \ USB Receive Hub Port Endpoint 11
+    1 CHARS FIELD:  USB0_TXFUNCADDR12     \ USB Transmit Functional Address
+                               \ Endpoint 12
+    1 +
+    1 CHARS FIELD:  USB0_TXHUBADDR12      \ USB Transmit Hub Address Endpoint 12
+    1 CHARS FIELD:  USB0_TXHUBPORT12      \ USB Transmit Hub Port Endpoint 12
+    1 CHARS FIELD:  USB0_RXFUNCADDR12     \ USB Receive Functional Address
+                               \ Endpoint 12
+    1 +
+    1 CHARS FIELD:  USB0_RXHUBADDR12      \ USB Receive Hub Address Endpoint 12
+    1 CHARS FIELD:  USB0_RXHUBPORT12      \ USB Receive Hub Port Endpoint 12
+    1 CHARS FIELD:  USB0_TXFUNCADDR13     \ USB Transmit Functional Address
+                               \ Endpoint 13
+    1 +
+    1 CHARS FIELD:  USB0_TXHUBADDR13      \ USB Transmit Hub Address Endpoint 13
+    1 CHARS FIELD:  USB0_TXHUBPORT13      \ USB Transmit Hub Port Endpoint 13
+    1 CHARS FIELD:  USB0_RXFUNCADDR13     \ USB Receive Functional Address
+                               \ Endpoint 13
+    1 +
+    1 CHARS FIELD:  USB0_RXHUBADDR13      \ USB Receive Hub Address Endpoint 13
+    1 CHARS FIELD:  USB0_RXHUBPORT13      \ USB Receive Hub Port Endpoint 13
+    1 CHARS FIELD:  USB0_TXFUNCADDR14     \ USB Transmit Functional Address
+                               \ Endpoint 14
+    1 +
+    1 CHARS FIELD:  USB0_TXHUBADDR14      \ USB Transmit Hub Address Endpoint 14
+    1 CHARS FIELD:  USB0_TXHUBPORT14      \ USB Transmit Hub Port Endpoint 14
+    1 CHARS FIELD:  USB0_RXFUNCADDR14     \ USB Receive Functional Address
+                               \ Endpoint 14
+    1 +
+    1 CHARS FIELD:  USB0_RXHUBADDR14      \ USB Receive Hub Address Endpoint 14
+    1 CHARS FIELD:  USB0_RXHUBPORT14      \ USB Receive Hub Port Endpoint 14
+    1 CHARS FIELD:  USB0_TXFUNCADDR15     \ USB Transmit Functional Address
+                               \ Endpoint 15
+    1 +
+    1 CHARS FIELD:  USB0_TXHUBADDR15      \ USB Transmit Hub Address Endpoint 15
+    1 CHARS FIELD:  USB0_TXHUBPORT15      \ USB Transmit Hub Port Endpoint 15
+    1 CHARS FIELD:  USB0_RXFUNCADDR15     \ USB Receive Functional Address
+                               \ Endpoint 15
+    1 +
+    1 CHARS FIELD:  USB0_RXHUBADDR15      \ USB Receive Hub Address Endpoint 15
+    1 CHARS FIELD:  USB0_RXHUBPORT15      \ USB Receive Hub Port Endpoint 15
+    2 +
+    1 CHARS FIELD:  USB0_CSRL0            \ USB Control and Status Endpoint 0 Low
+    1 CHARS FIELD:  USB0_CSRH0            \ USB Control and Status Endpoint 0 High
+    4 +
+    1 CHARS FIELD:  USB0_COUNT0           \ USB Receive Byte Count Endpoint 0
+    1 +
+    1 CHARS FIELD:  USB0_TYPE0            \ USB Type Endpoint 0
+    1 CHARS FIELD:  USB0_NAKLMT           \ USB NAK Limit
+    4 +
+    2 CHARS FIELD: USB0_TXMAXP1          \ USB Maximum Transmit Data Endpoint 1
+    1 CHARS FIELD:  USB0_TXCSRL1          \ USB Transmit Control and Status
+                               \ Endpoint 1 Low
+    1 CHARS FIELD:  USB0_TXCSRH1          \ USB Transmit Control and Status
+                               \ Endpoint 1 High
+    2 CHARS FIELD: USB0_RXMAXP1          \ USB Maximum Receive Data Endpoint 1
+    1 CHARS FIELD:  USB0_RXCSRL1          \ USB Receive Control and Status
+                               \ Endpoint 1 Low
+    1 CHARS FIELD:  USB0_RXCSRH1          \ USB Receive Control and Status
+                               \ Endpoint 1 High
+    2 CHARS FIELD: USB0_RXCOUNT1         \ USB Receive Byte Count Endpoint 1
+    1 CHARS FIELD:  USB0_TXTYPE1          \ USB Host Transmit Configure Type
+                               \ Endpoint 1
+    1 CHARS FIELD:  USB0_TXINTERVAL1      \ USB Host Transmit Interval Endpoint 1
+    1 CHARS FIELD:  USB0_RXTYPE1          \ USB Host Configure Receive Type
+                               \ Endpoint 1
+    1 CHARS FIELD:  USB0_RXINTERVAL1      \ USB Host Receive Polling Interval
+                               \ Endpoint 1
+    2 +
+    2 CHARS FIELD: USB0_TXMAXP2          \ USB Maximum Transmit Data Endpoint 2
+    1 CHARS FIELD:  USB0_TXCSRL2          \ USB Transmit Control and Status
+                               \ Endpoint 2 Low
+    1 CHARS FIELD:  USB0_TXCSRH2          \ USB Transmit Control and Status
+                               \ Endpoint 2 High
+    2 CHARS FIELD: USB0_RXMAXP2          \ USB Maximum Receive Data Endpoint 2
+    1 CHARS FIELD:  USB0_RXCSRL2          \ USB Receive Control and Status
+                               \ Endpoint 2 Low
+    1 CHARS FIELD:  USB0_RXCSRH2          \ USB Receive Control and Status
+                               \ Endpoint 2 High
+    2 CHARS FIELD: USB0_RXCOUNT2         \ USB Receive Byte Count Endpoint 2
+    1 CHARS FIELD:  USB0_TXTYPE2          \ USB Host Transmit Configure Type
+                               \ Endpoint 2
+    1 CHARS FIELD:  USB0_TXINTERVAL2      \ USB Host Transmit Interval Endpoint 2
+    1 CHARS FIELD:  USB0_RXTYPE2          \ USB Host Configure Receive Type
+                               \ Endpoint 2
+    1 CHARS FIELD:  USB0_RXINTERVAL2      \ USB Host Receive Polling Interval
+                               \ Endpoint 2
+    2 +
+    2 CHARS FIELD: USB0_TXMAXP3          \ USB Maximum Transmit Data Endpoint 3
+    1 CHARS FIELD:  USB0_TXCSRL3          \ USB Transmit Control and Status
+                               \ Endpoint 3 Low
+    1 CHARS FIELD:  USB0_TXCSRH3          \ USB Transmit Control and Status
+                               \ Endpoint 3 High
+    2 CHARS FIELD: USB0_RXMAXP3          \ USB Maximum Receive Data Endpoint 3
+    1 CHARS FIELD:  USB0_RXCSRL3          \ USB Receive Control and Status
+                               \ Endpoint 3 Low
+    1 CHARS FIELD:  USB0_RXCSRH3          \ USB Receive Control and Status
+                               \ Endpoint 3 High
+    2 CHARS FIELD: USB0_RXCOUNT3         \ USB Receive Byte Count Endpoint 3
+    1 CHARS FIELD:  USB0_TXTYPE3          \ USB Host Transmit Configure Type
+                               \ Endpoint 3
+    1 CHARS FIELD:  USB0_TXINTERVAL3      \ USB Host Transmit Interval Endpoint 3
+    1 CHARS FIELD:  USB0_RXTYPE3          \ USB Host Configure Receive Type
+                               \ Endpoint 3
+    1 CHARS FIELD:  USB0_RXINTERVAL3      \ USB Host Receive Polling Interval
+                               \ Endpoint 3
+    2 +
+    2 CHARS FIELD: USB0_TXMAXP4          \ USB Maximum Transmit Data Endpoint 4
+    1 CHARS FIELD:  USB0_TXCSRL4          \ USB Transmit Control and Status
+                               \ Endpoint 4 Low
+    1 CHARS FIELD:  USB0_TXCSRH4          \ USB Transmit Control and Status
+                               \ Endpoint 4 High
+    2 CHARS FIELD: USB0_RXMAXP4          \ USB Maximum Receive Data Endpoint 4
+    1 CHARS FIELD:  USB0_RXCSRL4          \ USB Receive Control and Status
+                               \ Endpoint 4 Low
+    1 CHARS FIELD:  USB0_RXCSRH4          \ USB Receive Control and Status
+                               \ Endpoint 4 High
+    2 CHARS FIELD: USB0_RXCOUNT4         \ USB Receive Byte Count Endpoint 4
+    1 CHARS FIELD:  USB0_TXTYPE4          \ USB Host Transmit Configure Type
+                               \ Endpoint 4
+    1 CHARS FIELD:  USB0_TXINTERVAL4      \ USB Host Transmit Interval Endpoint 4
+    1 CHARS FIELD:  USB0_RXTYPE4          \ USB Host Configure Receive Type
+                               \ Endpoint 4
+    1 CHARS FIELD:  USB0_RXINTERVAL4      \ USB Host Receive Polling Interval
+                               \ Endpoint 4
+    2 +
+    2 CHARS FIELD: USB0_TXMAXP5          \ USB Maximum Transmit Data Endpoint 5
+    1 CHARS FIELD:  USB0_TXCSRL5          \ USB Transmit Control and Status
+                               \ Endpoint 5 Low
+    1 CHARS FIELD:  USB0_TXCSRH5          \ USB Transmit Control and Status
+                               \ Endpoint 5 High
+    2 CHARS FIELD: USB0_RXMAXP5          \ USB Maximum Receive Data Endpoint 5
+    1 CHARS FIELD:  USB0_RXCSRL5          \ USB Receive Control and Status
+                               \ Endpoint 5 Low
+    1 CHARS FIELD:  USB0_RXCSRH5          \ USB Receive Control and Status
+                               \ Endpoint 5 High
+    2 CHARS FIELD: USB0_RXCOUNT5         \ USB Receive Byte Count Endpoint 5
+    1 CHARS FIELD:  USB0_TXTYPE5          \ USB Host Transmit Configure Type
+                               \ Endpoint 5
+    1 CHARS FIELD:  USB0_TXINTERVAL5      \ USB Host Transmit Interval Endpoint 5
+    1 CHARS FIELD:  USB0_RXTYPE5          \ USB Host Configure Receive Type
+                               \ Endpoint 5
+    1 CHARS FIELD:  USB0_RXINTERVAL5      \ USB Host Receive Polling Interval
+                               \ Endpoint 5
+    2 +
+    2 CHARS FIELD: USB0_TXMAXP6          \ USB Maximum Transmit Data Endpoint 6
+    1 CHARS FIELD:  USB0_TXCSRL6          \ USB Transmit Control and Status
+                               \ Endpoint 6 Low
+    1 CHARS FIELD:  USB0_TXCSRH6          \ USB Transmit Control and Status
+                               \ Endpoint 6 High
+    2 CHARS FIELD: USB0_RXMAXP6          \ USB Maximum Receive Data Endpoint 6
+    1 CHARS FIELD:  USB0_RXCSRL6          \ USB Receive Control and Status
+                               \ Endpoint 6 Low
+    1 CHARS FIELD:  USB0_RXCSRH6          \ USB Receive Control and Status
+                               \ Endpoint 6 High
+    2 CHARS FIELD: USB0_RXCOUNT6         \ USB Receive Byte Count Endpoint 6
+    1 CHARS FIELD:  USB0_TXTYPE6          \ USB Host Transmit Configure Type
+                               \ Endpoint 6
+    1 CHARS FIELD:  USB0_TXINTERVAL6      \ USB Host Transmit Interval Endpoint 6
+    1 CHARS FIELD:  USB0_RXTYPE6          \ USB Host Configure Receive Type
+                               \ Endpoint 6
+    1 CHARS FIELD:  USB0_RXINTERVAL6      \ USB Host Receive Polling Interval
+                               \ Endpoint 6
+    2 +
+    2 CHARS FIELD: USB0_TXMAXP7          \ USB Maximum Transmit Data Endpoint 7
+    1 CHARS FIELD:  USB0_TXCSRL7          \ USB Transmit Control and Status
+                               \ Endpoint 7 Low
+    1 CHARS FIELD:  USB0_TXCSRH7          \ USB Transmit Control and Status
+                               \ Endpoint 7 High
+    2 CHARS FIELD: USB0_RXMAXP7          \ USB Maximum Receive Data Endpoint 7
+    1 CHARS FIELD:  USB0_RXCSRL7          \ USB Receive Control and Status
+                               \ Endpoint 7 Low
+    1 CHARS FIELD:  USB0_RXCSRH7          \ USB Receive Control and Status
+                               \ Endpoint 7 High
+    2 CHARS FIELD: USB0_RXCOUNT7         \ USB Receive Byte Count Endpoint 7
+    1 CHARS FIELD:  USB0_TXTYPE7          \ USB Host Transmit Configure Type
+                               \ Endpoint 7
+    1 CHARS FIELD:  USB0_TXINTERVAL7      \ USB Host Transmit Interval Endpoint 7
+    1 CHARS FIELD:  USB0_RXTYPE7          \ USB Host Configure Receive Type
+                               \ Endpoint 7
+    1 CHARS FIELD:  USB0_RXINTERVAL7      \ USB Host Receive Polling Interval
+                               \ Endpoint 7
+    2 +
+    2 CHARS FIELD: USB0_TXMAXP8          \ USB Maximum Transmit Data Endpoint 8
+    1 CHARS FIELD:  USB0_TXCSRL8          \ USB Transmit Control and Status
+                               \ Endpoint 8 Low
+    1 CHARS FIELD:  USB0_TXCSRH8          \ USB Transmit Control and Status
+                               \ Endpoint 8 High
+    2 CHARS FIELD: USB0_RXMAXP8          \ USB Maximum Receive Data Endpoint 8
+    1 CHARS FIELD:  USB0_RXCSRL8          \ USB Receive Control and Status
+                               \ Endpoint 8 Low
+    1 CHARS FIELD:  USB0_RXCSRH8          \ USB Receive Control and Status
+                               \ Endpoint 8 High
+    2 CHARS FIELD: USB0_RXCOUNT8         \ USB Receive Byte Count Endpoint 8
+    1 CHARS FIELD:  USB0_TXTYPE8          \ USB Host Transmit Configure Type
+                               \ Endpoint 8
+    1 CHARS FIELD:  USB0_TXINTERVAL8      \ USB Host Transmit Interval Endpoint 8
+    1 CHARS FIELD:  USB0_RXTYPE8          \ USB Host Configure Receive Type
+                               \ Endpoint 8
+    1 CHARS FIELD:  USB0_RXINTERVAL8      \ USB Host Receive Polling Interval
+                               \ Endpoint 8
+    2 +
+    2 CHARS FIELD: USB0_TXMAXP9          \ USB Maximum Transmit Data Endpoint 9
+    1 CHARS FIELD:  USB0_TXCSRL9          \ USB Transmit Control and Status
+                               \ Endpoint 9 Low
+    1 CHARS FIELD:  USB0_TXCSRH9          \ USB Transmit Control and Status
+                               \ Endpoint 9 High
+    2 CHARS FIELD: USB0_RXMAXP9          \ USB Maximum Receive Data Endpoint 9
+    1 CHARS FIELD:  USB0_RXCSRL9          \ USB Receive Control and Status
+                               \ Endpoint 9 Low
+    1 CHARS FIELD:  USB0_RXCSRH9          \ USB Receive Control and Status
+                               \ Endpoint 9 High
+    2 CHARS FIELD: USB0_RXCOUNT9         \ USB Receive Byte Count Endpoint 9
+    1 CHARS FIELD:  USB0_TXTYPE9          \ USB Host Transmit Configure Type
+                               \ Endpoint 9
+    1 CHARS FIELD:  USB0_TXINTERVAL9      \ USB Host Transmit Interval Endpoint 9
+    1 CHARS FIELD:  USB0_RXTYPE9          \ USB Host Configure Receive Type
+                               \ Endpoint 9
+    1 CHARS FIELD:  USB0_RXINTERVAL9      \ USB Host Receive Polling Interval
+                               \ Endpoint 9
+    2 +
+    2 CHARS FIELD: USB0_TXMAXP10         \ USB Maximum Transmit Data Endpoint 10
+    1 CHARS FIELD:  USB0_TXCSRL10         \ USB Transmit Control and Status
+                               \ Endpoint 10 Low
+    1 CHARS FIELD:  USB0_TXCSRH10         \ USB Transmit Control and Status
+                               \ Endpoint 10 High
+    2 CHARS FIELD: USB0_RXMAXP10         \ USB Maximum Receive Data Endpoint 10
+    1 CHARS FIELD:  USB0_RXCSRL10         \ USB Receive Control and Status
+                               \ Endpoint 10 Low
+    1 CHARS FIELD:  USB0_RXCSRH10         \ USB Receive Control and Status
+                               \ Endpoint 10 High
+    2 CHARS FIELD: USB0_RXCOUNT10        \ USB Receive Byte Count Endpoint 10
+    1 CHARS FIELD:  USB0_TXTYPE10         \ USB Host Transmit Configure Type
+                               \ Endpoint 10
+    1 CHARS FIELD:  USB0_TXINTERVAL10     \ USB Host Transmit Interval Endpoint 10
+    1 CHARS FIELD:  USB0_RXTYPE10         \ USB Host Configure Receive Type
+                               \ Endpoint 10
+    1 CHARS FIELD:  USB0_RXINTERVAL10     \ USB Host Receive Polling Interval
+                               \ Endpoint 10
+    2 +
+    2 CHARS FIELD: USB0_TXMAXP11         \ USB Maximum Transmit Data Endpoint 11
+    1 CHARS FIELD:  USB0_TXCSRL11         \ USB Transmit Control and Status
+                               \ Endpoint 11 Low
+    1 CHARS FIELD:  USB0_TXCSRH11         \ USB Transmit Control and Status
+                               \ Endpoint 11 High
+    2 CHARS FIELD: USB0_RXMAXP11         \ USB Maximum Receive Data Endpoint 11
+    1 CHARS FIELD:  USB0_RXCSRL11         \ USB Receive Control and Status
+                               \ Endpoint 11 Low
+    1 CHARS FIELD:  USB0_RXCSRH11         \ USB Receive Control and Status
+                               \ Endpoint 11 High
+    2 CHARS FIELD: USB0_RXCOUNT11        \ USB Receive Byte Count Endpoint 11
+    1 CHARS FIELD:  USB0_TXTYPE11         \ USB Host Transmit Configure Type
+                               \ Endpoint 11
+    1 CHARS FIELD:  USB0_TXINTERVAL11     \ USB Host Transmit Interval Endpoint 11
+    1 CHARS FIELD:  USB0_RXTYPE11         \ USB Host Configure Receive Type
+                               \ Endpoint 11
+    1 CHARS FIELD:  USB0_RXINTERVAL11     \ USB Host Receive Polling Interval
+                               \ Endpoint 11
+    2 +
+    2 CHARS FIELD: USB0_TXMAXP12         \ USB Maximum Transmit Data Endpoint 12
+    1 CHARS FIELD:  USB0_TXCSRL12         \ USB Transmit Control and Status
+                               \ Endpoint 12 Low
+    1 CHARS FIELD:  USB0_TXCSRH12         \ USB Transmit Control and Status
+                               \ Endpoint 12 High
+    2 CHARS FIELD: USB0_RXMAXP12         \ USB Maximum Receive Data Endpoint 12
+    1 CHARS FIELD:  USB0_RXCSRL12         \ USB Receive Control and Status
+                               \ Endpoint 12 Low
+    1 CHARS FIELD:  USB0_RXCSRH12         \ USB Receive Control and Status
+                               \ Endpoint 12 High
+    2 CHARS FIELD: USB0_RXCOUNT12        \ USB Receive Byte Count Endpoint 12
+    1 CHARS FIELD:  USB0_TXTYPE12         \ USB Host Transmit Configure Type
+                               \ Endpoint 12
+    1 CHARS FIELD:  USB0_TXINTERVAL12     \ USB Host Transmit Interval Endpoint 12
+    1 CHARS FIELD:  USB0_RXTYPE12         \ USB Host Configure Receive Type
+                               \ Endpoint 12
+    1 CHARS FIELD:  USB0_RXINTERVAL12     \ USB Host Receive Polling Interval
+                               \ Endpoint 12
+    2 +
+    2 CHARS FIELD: USB0_TXMAXP13         \ USB Maximum Transmit Data Endpoint 13
+    1 CHARS FIELD:  USB0_TXCSRL13         \ USB Transmit Control and Status
+                               \ Endpoint 13 Low
+    1 CHARS FIELD:  USB0_TXCSRH13         \ USB Transmit Control and Status
+                               \ Endpoint 13 High
+    2 CHARS FIELD: USB0_RXMAXP13         \ USB Maximum Receive Data Endpoint 13
+    1 CHARS FIELD:  USB0_RXCSRL13         \ USB Receive Control and Status
+                               \ Endpoint 13 Low
+    1 CHARS FIELD:  USB0_RXCSRH13         \ USB Receive Control and Status
+                               \ Endpoint 13 High
+    2 CHARS FIELD: USB0_RXCOUNT13        \ USB Receive Byte Count Endpoint 13
+    1 CHARS FIELD:  USB0_TXTYPE13         \ USB Host Transmit Configure Type
+                               \ Endpoint 13
+    1 CHARS FIELD:  USB0_TXINTERVAL13     \ USB Host Transmit Interval Endpoint 13
+    1 CHARS FIELD:  USB0_RXTYPE13         \ USB Host Configure Receive Type
+                               \ Endpoint 13
+    1 CHARS FIELD:  USB0_RXINTERVAL13     \ USB Host Receive Polling Interval
+                               \ Endpoint 13
+    2 +
+    2 CHARS FIELD: USB0_TXMAXP14         \ USB Maximum Transmit Data Endpoint 14
+    1 CHARS FIELD:  USB0_TXCSRL14         \ USB Transmit Control and Status
+                               \ Endpoint 14 Low
+    1 CHARS FIELD:  USB0_TXCSRH14         \ USB Transmit Control and Status
+                               \ Endpoint 14 High
+    2 CHARS FIELD: USB0_RXMAXP14         \ USB Maximum Receive Data Endpoint 14
+    1 CHARS FIELD:  USB0_RXCSRL14         \ USB Receive Control and Status
+                               \ Endpoint 14 Low
+    1 CHARS FIELD:  USB0_RXCSRH14         \ USB Receive Control and Status
+                               \ Endpoint 14 High
+    2 CHARS FIELD: USB0_RXCOUNT14        \ USB Receive Byte Count Endpoint 14
+    1 CHARS FIELD:  USB0_TXTYPE14         \ USB Host Transmit Configure Type
+                               \ Endpoint 14
+    1 CHARS FIELD:  USB0_TXINTERVAL14     \ USB Host Transmit Interval Endpoint 14
+    1 CHARS FIELD:  USB0_RXTYPE14         \ USB Host Configure Receive Type
+                               \ Endpoint 14
+    1 CHARS FIELD:  USB0_RXINTERVAL14     \ USB Host Receive Polling Interval
+                               \ Endpoint 14
+    2 +
+    2 CHARS FIELD: USB0_TXMAXP15         \ USB Maximum Transmit Data Endpoint 15
+    1 CHARS FIELD:  USB0_TXCSRL15         \ USB Transmit Control and Status
+                               \ Endpoint 15 Low
+    1 CHARS FIELD:  USB0_TXCSRH15         \ USB Transmit Control and Status
+                               \ Endpoint 15 High
+    2 CHARS FIELD: USB0_RXMAXP15         \ USB Maximum Receive Data Endpoint 15
+    1 CHARS FIELD:  USB0_RXCSRL15         \ USB Receive Control and Status
+                               \ Endpoint 15 Low
+    1 CHARS FIELD:  USB0_RXCSRH15         \ USB Receive Control and Status
+                               \ Endpoint 15 High
+    2 CHARS FIELD: USB0_RXCOUNT15        \ USB Receive Byte Count Endpoint 15
+    1 CHARS FIELD:  USB0_TXTYPE15         \ USB Host Transmit Configure Type
+                               \ Endpoint 15
+    1 CHARS FIELD:  USB0_TXINTERVAL15     \ USB Host Transmit Interval Endpoint 15
+    1 CHARS FIELD:  USB0_RXTYPE15         \ USB Host Configure Receive Type
+                               \ Endpoint 15
+    1 CHARS FIELD:  USB0_RXINTERVAL15     \ USB Host Receive Polling Interval
+                               \ Endpoint 15
+    262 +
+    2 CHARS FIELD: USB0_RQPKTCOUNT1      \ USB Request Packet Count in Block
+                               \ Transfer Endpoint 1
+    2 +
+    2 CHARS FIELD: USB0_RQPKTCOUNT2      \ USB Request Packet Count in Block
+                               \ Transfer Endpoint 2
+    2 +
+    2 CHARS FIELD: USB0_RQPKTCOUNT3      \ USB Request Packet Count in Block
+                               \ Transfer Endpoint 3
+    2 +
+    2 CHARS FIELD: USB0_RQPKTCOUNT4      \ USB Request Packet Count in Block
+                               \ Transfer Endpoint 4
+    2 +
+    2 CHARS FIELD: USB0_RQPKTCOUNT5      \ USB Request Packet Count in Block
+                               \ Transfer Endpoint 5
+    2 +
+    2 CHARS FIELD: USB0_RQPKTCOUNT6      \ USB Request Packet Count in Block
+                               \ Transfer Endpoint 6
+    2 +
+    2 CHARS FIELD: USB0_RQPKTCOUNT7      \ USB Request Packet Count in Block
+                               \ Transfer Endpoint 7
+    2 +
+    2 CHARS FIELD: USB0_RQPKTCOUNT8      \ USB Request Packet Count in Block
+                               \ Transfer Endpoint 8
+    2 +
+    2 CHARS FIELD: USB0_RQPKTCOUNT9      \ USB Request Packet Count in Block
+                               \ Transfer Endpoint 9
+    2 +
+    2 CHARS FIELD: USB0_RQPKTCOUNT10     \ USB Request Packet Count in Block
+                               \ Transfer Endpoint 10
+    2 +
+    2 CHARS FIELD: USB0_RQPKTCOUNT11     \ USB Request Packet Count in Block
+                               \ Transfer Endpoint 11
+    2 +
+    2 CHARS FIELD: USB0_RQPKTCOUNT12     \ USB Request Packet Count in Block
+                               \ Transfer Endpoint 12
+    2 +
+    2 CHARS FIELD: USB0_RQPKTCOUNT13     \ USB Request Packet Count in Block
+                               \ Transfer Endpoint 13
+    2 +
+    2 CHARS FIELD: USB0_RQPKTCOUNT14     \ USB Request Packet Count in Block
+                               \ Transfer Endpoint 14
+    2 +
+    2 CHARS FIELD: USB0_RQPKTCOUNT15     \ USB Request Packet Count in Block
+                               \ Transfer Endpoint 15
+    2 +
+    2 CHARS FIELD: USB0_RXDPKTBUFDIS     \ USB Receive Double Packet Buffer Disable
+    2 CHARS FIELD: USB0_TXDPKTBUFDIS     \ USB Transmit Double Packet Buffer
+                               \ Disable
+    188 +
+    CELL FIELD: USB0_EPC              \ USB External Power Control
+    CELL FIELD: USB0_EPCRIS           \ USB External Power Control Raw Interrupt Status
+    CELL FIELD: USB0_EPCIM            \ USB External Power Control Interrupt
+                               \ Mask
+    CELL FIELD: USB0_EPCISC           \ USB External Power Control Interrupt
+                               \ Status and Clear
+    CELL FIELD: USB0_DRRIS            \ USB Device Resume Raw Interrupt Status
+    CELL FIELD: USB0_DRIM             \ USB Device Resume Interrupt Mask
+    CELL FIELD: USB0_DRISC            \ USB Device Resume Interrupt Status and
+                               \ Clear
+    CELL FIELD: USB0_GPCS             \ USB General-Purpose Control and Status
+    16 +
+    CELL FIELD: USB0_VDC              \ USB VBUS Droop Control
+    CELL FIELD: USB0_VDCRIS           \ USB VBUS Droop Control Raw Interrupt
+                               \ Status
+    CELL FIELD: USB0_VDCIM            \ USB VBUS Droop Control Interrupt Mask
+    CELL FIELD: USB0_VDCISC           \ USB VBUS Droop Control Interrupt
+                               \ Status and Clear
+    4 +
+    CELL FIELD: USB0_IDVRIS           \ USB ID Valid Detect Raw Interrupt Status
+    CELL FIELD: USB0_IDVIM            \ USB ID Valid Detect Interrupt Mask
+    CELL FIELD: USB0_IDVISC           \ USB ID Valid Detect Interrupt
+                               \ Status and Clear
+    CELL FIELD: USB0_DMASEL           \ USB DMA Select
+DROP
+
+

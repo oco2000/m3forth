@@ -1,0 +1,7 @@
+\ add a name for any new device
+
+0 enum
+    test_device
+    proteus_device
+    stm32vldiscovery
+; DROP

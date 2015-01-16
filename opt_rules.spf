@@ -1,0 +1,632 @@
+\ Optimizer rules
+
+HOST
+
+: VERY_SHORT? ( n -- f )
+    0 0x100 WITHIN ;
+
+: SHORT? ( n -- f )
+    0 0x1000 WITHIN ;
+
+: RAMBASE? ( addr -- f ) \ is address inside rambase region?
+    'RAMBASE - -255 4096 WITHIN ;
+
+INTERPRETER
+\ optimize rambase operations
+\ using:    address [RAM] reg str/ldr
+: [RAM] ( addr -- ) \ uses tmp register or rambase
+    DUP RAMBASE? IF
+        'RAMBASE - DUP 0< IF [ASM]
+            NEGATE [ # rambase -]
+        ELSE
+            [ # rambase ]
+        THEN
+        [END-ASM]
+    ELSE
+        [ASM] tmp #mov    [ tmp ] [END-ASM]
+    THEN
+;
+
+: (LIT_ADD) ( n -- )
+    [ASM] DUP VERY_SHORT? IF
+            # tos adds \ 2 bytes
+        ELSE DUP SHORT? IF
+            # tos tos addw \ 4 bytes
+        ELSE DUP ?CONST IF
+            # tos tos add \ 4 bytes
+        ELSE    tmp #mov   tmp tos tos adds THEN THEN THEN
+    [END-ASM]
+;
+
+: (LIT_SUB) ( n -- )
+    [ASM] DUP VERY_SHORT? IF
+            # tos subs \ 2 bytes
+        ELSE DUP SHORT? IF
+            # tos tos subw \ 4 bytes
+        ELSE DUP ?CONST IF
+            # tos tos sub \ 4 bytes
+        ELSE    tmp #mov   tmp tos tos subs THEN THEN THEN
+    [END-ASM]
+;
+
+: (LIT_AND) ( n -- )
+    [ASM]
+        ?DUP IF
+            DUP -1 = IF DROP    \ -1 AND - no changes
+            ELSE DUP ?CONST IF
+                # tos tos and   \ 4 bytes
+            ELSE  tmp #mov   tmp tos ands
+            THEN THEN
+        ELSE \ 0 AND -> 0
+            0 tos #mov
+        THEN
+    [END-ASM]
+;
+
+: (LIT_ANDC) ( n -- )
+    [ASM]
+        DUP -1 <> IF
+            DUP 0 = IF DROP
+            ELSE DUP ?CONST IF
+                # tos tos bics  \ 4 bytes
+            ELSE  tmp #mov   tmp tos bics
+            THEN THEN
+        ELSE
+            DROP 0 tos #mov
+        THEN
+    [END-ASM]
+;
+
+: (LIT_OR) ( n -- )
+    [ASM]
+        ?DUP IF \ 0 OR - no changes
+            DUP -1 = IF tos #mov \ x -1 OR - simply put x
+            ELSE
+                DUP 0< IF \ try orn
+                    DUP INVERT ?CONST IF
+                        INVERT # tos tos orn  \ 4 bytes
+                    ELSE
+                        tmp #mov   tmp tos orrs
+                    THEN
+                ELSE
+                    DUP ?CONST IF
+                        # tos tos orr    \ 4 bytes
+                    ELSE
+                        tmp #mov   tmp tos orrs
+                    THEN
+                THEN
+            THEN
+        THEN
+    [END-ASM]
+;
+
+: (LIT_XOR) ( n -- )
+    [ASM]
+        ?DUP IF \ 0 XOR - no changes
+            DUP -1 = IF DROP tos tos mvns \ -1 XOR -> INVERT
+            ELSE
+                DUP ?CONST IF
+                    # tos tos eor \ 4 bytes
+                ELSE
+                    tmp #mov   tmp tos eors
+                THEN
+            THEN
+        THEN
+    [END-ASM]
+;
+
+: (LIT_CMP) ( n -- )
+    [ASM] DUP VERY_SHORT? IF
+            # tos cmp  \ 2 bytes
+        ELSE DUP ?CONST IF
+            # tos cmp  \ 4 bytes
+        ELSE    tmp #mov   tmp tos cmp   THEN THEN
+    [END-ASM]
+;
+
+: BITBAND? ( addr -- f ) \ address inside bit-banding region?
+    DUP 0x20000000 0x20100000 WITHIN SWAP
+    0x40000000 0x40100000 WITHIN OR
+    O_BITBANDING AND
+;
+
+: MASK_BITBAND? ( mask addr -- f ) \ bitband region and only 1 bit is set in the mask
+    BITBAND? SWAP   1s 1 =   AND
+;
+
+: BITBAND ( bit addr1 -- addr2 ) \ get bit-banding address
+    DUP 0xFFF00000 AND 0x02000000 OR
+    SWAP 0xFFFFF AND 32 * +
+    SWAP 4 * +
+;
+
+: (BSET) ( bit# addr -- ) \ set bit with bit-banding
+    [ASM]
+    DUP BITBAND? IF
+        BITBAND tmp1 #mov  [ tmp1 ] r10 str
+    ELSE
+        tmp #mov   [ tmp ] tmp1 ldr   BIT tmp2 #mov   tmp2 tmp1 orrs   [ tmp ] tmp1 str
+    THEN
+    [END-ASM]
+;
+
+: (BCLEAR) ( bit# addr -- ) \ clear bit with bit-banding
+    [ASM] DUP BITBAND? IF
+        BITBAND tmp1 #mov  [ tmp1 ] r9 str
+    ELSE
+        tmp1 #mov   [ tmp ] tmp1 ldr   BIT tmp2 #mov   tmp2 tmp1 bics   [ tmp ] tmp1 str
+    THEN
+    [END-ASM] ;
+
+: (BSWITCH) ( bit# addr -- ) \ toggle bit with bit-banding
+    [ASM]  DUP BITBAND? IF
+        BITBAND tmp1 #mov  [ tmp1 ] tmp ldr   1 # tmp tmp adds   [ tmp1 ] tmp str
+    ELSE
+        tmp1 #mov   [ tmp ] tmp1 ldr   BIT tmp2 #mov   tmp2 tmp1 eors   [ tmp ] tmp1 str
+    THEN
+    [END-ASM] ;
+
+: (SET) ( mask addr -- ) \ set bits in a word according to mask
+    [ASM]
+    2DUP MASK_BITBAND? IF \ use bit-banding
+        SWAP LSB SWAP (BSET)
+    ELSE
+        SWAP ?DUP IF \ mask <> 0
+            SWAP tmp #mov \ address
+            DUP -1 <> IF \ if mask = 0xFFFFFFFF, read can be omitted
+                [ tmp ] tmp2 ldr
+            THEN
+            DUP ?CONST IF
+                # tmp2 tmp2 orrs \ or with mask
+            ELSE
+                tmp1 #mov
+                tmp1 tmp2 orrs  \ or with mask
+            THEN
+            [ tmp ] tmp2 str
+        ELSE DROP THEN
+    THEN
+    [END-ASM]
+;
+
+: (CLEAR) ( mask addr -- ) \ clear bits in a word according to mask
+    [ASM]
+    2DUP MASK_BITBAND? IF \ use bit-banding
+        SWAP LSB SWAP (BCLEAR)
+    ELSE
+        SWAP ?DUP IF \ mask <> 0
+            SWAP tmp #mov \ address
+            DUP -1 <> IF \ if mask = 0xFFFFFFFF, read can be omitted
+                [ tmp ] tmp2 ldr
+                DUP ?CONST IF
+                    # tmp2 tmp2 bics \ and with ~mask
+                ELSE
+                    tmp1 #mov
+                    tmp1 tmp2 bics  \ and with ~mask
+                THEN
+            ELSE
+                DROP 0 tmp2 #mov
+            THEN
+            [ tmp ] tmp2 str
+        ELSE DROP THEN
+    THEN
+    [END-ASM]
+;
+
+: (SWITCH) ( mask addr -- ) \ toggle bits in a word according to mask
+    [ASM]
+    2DUP MASK_BITBAND? IF \ use bit-banding
+        SWAP LSB SWAP (BSWITCH)
+    ELSE
+        SWAP ?DUP IF \ mask <> 0
+            SWAP tmp #mov \ address
+            [ tmp ] tmp2 ldr
+            DUP -1 <> IF \ if mask = 0xFFFFFFFF, use mvn
+                DUP ?CONST IF
+                    # tmp2 tmp2 eors \ and with ~mask
+                ELSE
+                    tmp1 #mov
+                    tmp1 tmp2 eors  \ and with ~mask
+                THEN
+            ELSE
+                DROP tmp2 tmp2 mvns
+            THEN
+            [ tmp ] tmp2 str
+        ELSE DROP THEN
+    THEN
+    [END-ASM]
+;
+
+: regconst? ( x -- f )
+    DUP 0= SWAP -1 = OR
+;
+
+: GIVE_REG ( const -- ) \ push reg to regstack
+    [ASM]
+        IF \ -1
+            r10
+        ELSE \ 0
+            r9
+        THEN
+    [END-ASM]
+;
+
+: (LIT_LIT_!) ( x addr -- )
+    [ASM]
+        OVER regconst? IF
+            [RAM] GIVE_REG str
+        ELSE
+            SWAP tmp1 #mov  [RAM] tmp1 str
+        THEN
+    [END-ASM]
+;
+
+: (LIT_LIT_C!) ( x addr -- )
+    [ASM]
+        OVER regconst? IF
+            [RAM] GIVE_REG strb
+        ELSE
+            SWAP tmp1 #mov  [RAM] tmp1 strb
+        THEN
+    [END-ASM]
+;
+
+: (LIT_LIT_H!) ( x addr -- )
+    [ASM]
+        OVER regconst? IF
+            [RAM] GIVE_REG strh
+        ELSE
+            SWAP tmp1 #mov  [RAM] tmp1 strh
+        THEN
+    [END-ASM]
+;
+
+COMPILER
+
+\ optimizing words
+
+: LIT_LSHIFT ( -- )
+    @LITERAL ?DUP IF [ASM]  # tos tos lsls  [END-ASM] THEN .SELF ;
+
+: LIT_RSHIFT ( -- )
+    @LITERAL ?DUP IF [ASM]  # tos tos lsrs  [END-ASM] THEN .SELF ;
+
+: LIT_! ( -- )
+    [ASM] @LITERAL [RAM] tos str   popt [END-ASM] .SELF ;
+
+: LIT_LIT_! ( -- )
+    @LITERALS (LIT_LIT_!) .SELF ;
+
+: LIT_C! ( -- )
+    [ASM] @LITERAL [RAM] tos strb  popt [END-ASM] .SELF ;
+
+: LIT_LIT_C! ( -- )
+    @LITERALS (LIT_LIT_C!) .SELF ;
+
+: LIT_H! ( -- )
+    [ASM] @LITERAL [RAM] tos strh   popt [END-ASM] .SELF ;
+
+: LIT_LIT_H! ( -- )
+    @LITERALS (LIT_LIT_H!) .SELF ;
+
+: LIT_@ ( -- )
+    [ASM] pusht @LITERAL [RAM] tos ldr   [END-ASM] .SELF ;
+
+: LIT_C@ ( -- )
+    [ASM] pusht @LITERAL [RAM] tos ldrb   [END-ASM] .SELF ;
+
+: LIT_H@ ( -- )
+    [ASM] pusht @LITERAL [RAM] tos ldrh   [END-ASM] .SELF ;
+
+: LIT_PICK ( -- )
+    [ASM] pusht   @LITERAL ?DUP IF [ CELL * # fsp ] tos ldr THEN  [END-ASM] .SELF ;
+
+: LIT_* ( -- )
+    [ASM] @LITERAL tmp #mov   tmp tos muls  [END-ASM] .SELF ;
+
+: LIT_ADD ( -- )
+    @LITERAL ?DUP IF DUP 0> IF (LIT_ADD) ELSE NEGATE (LIT_SUB) THEN THEN .SELF ;
+
+: LIT_SUB ( -- )
+    @LITERAL ?DUP IF DUP 0> IF (LIT_SUB) ELSE NEGATE (LIT_ADD) THEN THEN .SELF ;
+
+: LIT_AND ( -- )
+    @LITERAL (LIT_AND) .SELF ;
+
+: LIT_ANDC ( -- )
+    @LITERAL (LIT_ANDC) .SELF ;
+
+: LIT_OR ( -- )
+    @LITERAL (LIT_OR) .SELF ;
+
+: LIT_XOR ( -- )
+    @LITERAL (LIT_XOR) .SELF ;
+
+: CMP_IF ( if_frame1 -- if_frame2 )
+    2DROP [ASM]  { tmp } pops    tos tmp cmp   popt    RULEX  if    [END-ASM] .SELF ;
+
+: CMP_WHILE ( if_frame1 -- if_frame2 )
+    2DROP [ASM]  { tmp } pops    tos tmp cmp   popt    RULEX  while    [END-ASM] .SELF ;
+
+: CMP_UNTIL ( frame1 -- frame2 )
+    [ASM]  { tmp } pops    tos tmp cmp   popt    RULEX  LAST-FRAME 2@ until     [END-ASM] .SELF ;
+
+: LIT_CMP_IF ( if_frame1 -- if_frame2 )
+    2DROP [ASM]  @LITERAL2 (LIT_CMP) popt  RULEX  if    [END-ASM] .SELF ;
+
+: LIT_CMP_WHILE ( if_frame1 -- if_frame2 )
+    2DROP [ASM]  @LITERAL2 (LIT_CMP) popt  RULEX  while    [END-ASM] .SELF ;
+
+: LIT_CMP_UNTIL ( if_frame1 -- if_frame2 )
+    [ASM]  @LITERAL2 (LIT_CMP) popt  RULEX  LAST-FRAME 2@ until    [END-ASM] .SELF ;
+
+: DUP_LIT_CMP_IF ( if_frame1 -- if_frame2 )
+    2DROP [ASM]  @LITERAL2 (LIT_CMP)   RULEX  if    [END-ASM] .SELF ;
+
+: DUP_LIT_CMP_WHILE ( if_frame1 -- if_frame2 )
+    2DROP [ASM]  @LITERAL2 (LIT_CMP)   RULEX  while    [END-ASM] .SELF ;
+
+: DUP_LIT_CMP_UNTIL ( if_frame1 -- if_frame2 )
+    [ASM]  @LITERAL2 (LIT_CMP)   RULEX  LAST-FRAME 2@ until    [END-ASM] .SELF ;
+
+: TST_IF ( if_frame1 -- if_frame2 )
+    2DROP [ASM]  0 # tos cmp   popt    RULEX  if    [END-ASM] .SELF ;
+
+: TST_WHILE ( if_frame1 -- if_frame2 )
+    2DROP [ASM]  0 # tos cmp   popt    RULEX  while    [END-ASM] .SELF ;
+
+: TST_UNTIL ( frame1 -- frame2 )
+    [ASM]  0 # tos cmp   popt    RULEX  LAST-FRAME 2@ until     [END-ASM] .SELF ;
+
+: DUP_TST_IF ( if_frame1 -- if_frame2 )
+    2DROP [ASM]  0 # tos cmp       RULEX  if    [END-ASM] .SELF ;
+
+: DUP_TST_WHILE ( if_frame1 -- if_frame2 )
+    2DROP [ASM]  0 # tos cmp       RULEX  while    [END-ASM] .SELF ;
+
+: DUP_TST_UNTIL ( frame1 -- frame2 )
+    [ASM]  0 # tos cmp       RULEX  LAST-FRAME 2@ until     [END-ASM] .SELF ;
+
+: ?DUP_IF ( if_frame1 -- if_frame2 )
+    2DROP [ASM]  0 # tos cmp      eq it   popt     ne if    [END-ASM] .SELF ;
+
+: OVER-
+    [ASM]  [ fsp ] tmp ldr   tmp tos tos subs   [END-ASM] .SELF ;
+
+: OVER+
+    [ASM]  [ fsp ] tmp ldr   tmp tos tos adds   [END-ASM] .SELF ;
+
+: LIT_LIT_BSET
+    @LITERALS (BSET) .SELF ;
+
+: LIT_LIT_BCLEAR
+    @LITERALS (BCLEAR) .SELF ;
+
+: LIT_LIT_BSWITCH
+    @LITERALS (BSWITCH) .SELF ;
+
+: LIT_LIT_SET ( -- )
+    @LITERALS (SET) .SELF ;
+
+: LIT_LIT_CLEAR ( -- )
+    @LITERALS (CLEAR) .SELF ;
+
+: LIT_LIT_SWITCH ( -- )
+    @LITERALS (SWITCH) .SELF ;
+
+HOST
+
+: REPLACE-LITERALS
+    CREATE , ,
+    DOES>
+        DUP 2@ SWAP >R
+        DUP 1 = IF @LITERAL SWAP ELSE @LITERALS ROT THEN  1+ qCLEAR \ remove literals and last word from queue
+        R> EXECUTE \ execute a replacer
+        [ COMPILER ] POSTPONE LITERAL [ HOST ]
+        O_DEBUG IF .WORD ELSE DROP THEN ;
+
+
+HOST '    BIT 1 COMPILER   REPLACE-LITERALS LIT_BIT
+HOST '     1+ 1 COMPILER   REPLACE-LITERALS LIT_1+
+HOST '   NOOP 1 COMPILER   REPLACE-LITERALS LIT_NOOP
+INTERPRETER 'H CELLS 1 COMPILER   REPLACE-LITERALS LIT_CELLS
+HOST '      + 2 COMPILER   REPLACE-LITERALS LIT_LIT_+
+HOST ' LSHIFT 2 COMPILER   REPLACE-LITERALS LIT_LIT_LSHIFT
+HOST ' RSHIFT 2 COMPILER   REPLACE-LITERALS LIT_LIT_RSHIFT
+HOST '     OR 2 COMPILER   REPLACE-LITERALS LIT_LIT_OR
+
+: LIT_@_EXECUTE ( xt -- )
+    [ASM]  [RAM] tmp ldr   tmp blx [END-ASM] .SELF  ;
+
+ALSO COMPILING ' LIT_@_EXECUTE PREVIOUS  INTERPRETER IS COMPILE-INLINE-DEFER
+
+\ optimizing rules
+
+TARGET
+
+OPTIMIZE LIT +                  WITH LIT_ADD
+OPTIMIZE LIT -                  WITH LIT_SUB
+OPTIMIZE LIT AND                WITH LIT_AND
+OPTIMIZE LIT ANDC               WITH LIT_ANDC
+OPTIMIZE LIT OR                 WITH LIT_OR
+OPTIMIZE LIT XOR                WITH LIT_XOR
+OPTIMIZE LIT *                  WITH LIT_*
+
+OPTIMIZE LIT !                  WITH LIT_!
+OPTIMIZE LIT LIT !              WITH LIT_LIT_!
+OPTIMIZE LIT C!                 WITH LIT_C!
+OPTIMIZE LIT LIT C!             WITH LIT_LIT_C!
+OPTIMIZE LIT H!                 WITH LIT_H!
+OPTIMIZE LIT LIT H!             WITH LIT_LIT_H!
+
+OPTIMIZE LIT @                  WITH LIT_@
+OPTIMIZE LIT C@                 WITH LIT_C@
+OPTIMIZE LIT H@                 WITH LIT_H@
+
+OPTIMIZE LIT LSHIFT             WITH LIT_LSHIFT
+OPTIMIZE LIT RSHIFT             WITH LIT_RSHIFT
+
+OPTIMIZE LIT PICK               WITH LIT_PICK
+
+OPTIMIZE LIT LIT BSET           WITH LIT_LIT_BSET
+OPTIMIZE LIT LIT BCLEAR         WITH LIT_LIT_BCLEAR
+OPTIMIZE LIT LIT BSWITCH        WITH LIT_LIT_BSWITCH
+
+OPTIMIZE LIT LIT SET            WITH LIT_LIT_SET
+OPTIMIZE LIT LIT CLEAR          WITH LIT_LIT_CLEAR
+OPTIMIZE LIT LIT SWITCH         WITH LIT_LIT_SWITCH
+
+OPTIMIZE LIT BIT                WITH LIT_BIT
+OPTIMIZE LIT 1+                 WITH LIT_1+
+OPTIMIZE LIT CHAR+              WITH LIT_1+
+OPTIMIZE LIT CHARS              WITH LIT_NOOP
+OPTIMIZE LIT CELLS              WITH LIT_CELLS
+OPTIMIZE LIT LIT +              WITH LIT_LIT_+
+OPTIMIZE LIT LIT OR             WITH LIT_LIT_OR
+OPTIMIZE LIT LIT LSHIFT         WITH LIT_LIT_LSHIFT
+OPTIMIZE LIT LIT RSHIFT         WITH LIT_LIT_RSHIFT
+
+OPTIMIZE ?DUP IF                WITH ?DUP_IF
+
+OPTIMIZE < IF                   WITH CMP_IF             ASSEMBLE lt
+OPTIMIZE > IF                   WITH CMP_IF             ASSEMBLE gt
+OPTIMIZE = IF                   WITH CMP_IF             ASSEMBLE eq
+OPTIMIZE <> IF                  WITH CMP_IF             ASSEMBLE ne
+OPTIMIZE - IF                   WITH CMP_IF             ASSEMBLE ne
+OPTIMIZE XOR IF                 WITH CMP_IF             ASSEMBLE ne
+OPTIMIZE U< IF                  WITH CMP_IF             ASSEMBLE cc
+OPTIMIZE U> IF                  WITH CMP_IF             ASSEMBLE hi
+
+OPTIMIZE LIT < IF               WITH LIT_CMP_IF         ASSEMBLE lt
+OPTIMIZE LIT > IF               WITH LIT_CMP_IF         ASSEMBLE gt
+OPTIMIZE LIT = IF               WITH LIT_CMP_IF         ASSEMBLE eq
+OPTIMIZE LIT <> IF              WITH LIT_CMP_IF         ASSEMBLE ne
+OPTIMIZE LIT - IF               WITH LIT_CMP_IF         ASSEMBLE ne
+OPTIMIZE LIT XOR IF             WITH LIT_CMP_IF         ASSEMBLE ne
+OPTIMIZE LIT U< IF              WITH LIT_CMP_IF         ASSEMBLE cc
+OPTIMIZE LIT U> IF              WITH LIT_CMP_IF         ASSEMBLE hi
+
+OPTIMIZE DUP LIT < IF           WITH DUP_LIT_CMP_IF     ASSEMBLE lt
+OPTIMIZE DUP LIT > IF           WITH DUP_LIT_CMP_IF     ASSEMBLE gt
+OPTIMIZE DUP LIT = IF           WITH DUP_LIT_CMP_IF     ASSEMBLE eq
+OPTIMIZE DUP LIT <> IF          WITH DUP_LIT_CMP_IF     ASSEMBLE ne
+OPTIMIZE DUP LIT - IF           WITH DUP_LIT_CMP_IF     ASSEMBLE ne
+OPTIMIZE DUP LIT XOR IF         WITH DUP_LIT_CMP_IF     ASSEMBLE ne
+OPTIMIZE DUP LIT U< IF          WITH DUP_LIT_CMP_IF     ASSEMBLE cc
+OPTIMIZE DUP LIT U> IF          WITH DUP_LIT_CMP_IF     ASSEMBLE hi
+
+OPTIMIZE < WHILE                WITH CMP_WHILE          ASSEMBLE lt
+OPTIMIZE > WHILE                WITH CMP_WHILE          ASSEMBLE gt
+OPTIMIZE = WHILE                WITH CMP_WHILE          ASSEMBLE eq
+OPTIMIZE <> WHILE               WITH CMP_WHILE          ASSEMBLE ne
+OPTIMIZE - WHILE                WITH CMP_WHILE          ASSEMBLE ne
+OPTIMIZE XOR WHILE              WITH CMP_WHILE          ASSEMBLE ne
+OPTIMIZE U< WHILE               WITH CMP_WHILE          ASSEMBLE cc
+OPTIMIZE U> WHILE               WITH CMP_WHILE          ASSEMBLE hi
+
+OPTIMIZE LIT < WHILE            WITH LIT_CMP_WHILE      ASSEMBLE lt
+OPTIMIZE LIT > WHILE            WITH LIT_CMP_WHILE      ASSEMBLE gt
+OPTIMIZE LIT = WHILE            WITH LIT_CMP_WHILE      ASSEMBLE eq
+OPTIMIZE LIT <> WHILE           WITH LIT_CMP_WHILE      ASSEMBLE ne
+OPTIMIZE LIT - WHILE            WITH LIT_CMP_WHILE      ASSEMBLE ne
+OPTIMIZE LIT XOR WHILE          WITH LIT_CMP_WHILE      ASSEMBLE ne
+OPTIMIZE LIT U< WHILE           WITH LIT_CMP_WHILE      ASSEMBLE cc
+OPTIMIZE LIT U> WHILE           WITH LIT_CMP_WHILE      ASSEMBLE hi
+
+OPTIMIZE DUP LIT < WHILE        WITH DUP_LIT_CMP_WHILE  ASSEMBLE lt
+OPTIMIZE DUP LIT > WHILE        WITH DUP_LIT_CMP_WHILE  ASSEMBLE gt
+OPTIMIZE DUP LIT = WHILE        WITH DUP_LIT_CMP_WHILE  ASSEMBLE eq
+OPTIMIZE DUP LIT <> WHILE       WITH DUP_LIT_CMP_WHILE  ASSEMBLE ne
+OPTIMIZE DUP LIT - WHILE        WITH DUP_LIT_CMP_WHILE  ASSEMBLE ne
+OPTIMIZE DUP LIT XOR WHILE      WITH DUP_LIT_CMP_WHILE  ASSEMBLE ne
+OPTIMIZE DUP LIT U< WHILE       WITH DUP_LIT_CMP_WHILE  ASSEMBLE cc
+OPTIMIZE DUP LIT U> WHILE       WITH DUP_LIT_CMP_WHILE  ASSEMBLE hi
+
+OPTIMIZE < UNTIL                WITH CMP_UNTIL          ASSEMBLE lt
+OPTIMIZE > UNTIL                WITH CMP_UNTIL          ASSEMBLE gt
+OPTIMIZE = UNTIL                WITH CMP_UNTIL          ASSEMBLE eq
+OPTIMIZE <> UNTIL               WITH CMP_UNTIL          ASSEMBLE ne
+OPTIMIZE - UNTIL                WITH CMP_UNTIL          ASSEMBLE ne
+OPTIMIZE XOR UNTIL              WITH CMP_UNTIL          ASSEMBLE ne
+OPTIMIZE U< UNTIL               WITH CMP_UNTIL          ASSEMBLE cc
+OPTIMIZE U> UNTIL               WITH CMP_UNTIL          ASSEMBLE hi
+
+OPTIMIZE LIT < UNTIL            WITH LIT_CMP_UNTIL      ASSEMBLE lt
+OPTIMIZE LIT > UNTIL            WITH LIT_CMP_UNTIL      ASSEMBLE gt
+OPTIMIZE LIT = UNTIL            WITH LIT_CMP_UNTIL      ASSEMBLE eq
+OPTIMIZE LIT <> UNTIL           WITH LIT_CMP_UNTIL      ASSEMBLE ne
+OPTIMIZE LIT - UNTIL            WITH LIT_CMP_UNTIL      ASSEMBLE ne
+OPTIMIZE LIT XOR UNTIL          WITH LIT_CMP_UNTIL      ASSEMBLE ne
+OPTIMIZE LIT U< UNTIL           WITH LIT_CMP_UNTIL      ASSEMBLE cc
+OPTIMIZE LIT U> UNTIL           WITH LIT_CMP_UNTIL      ASSEMBLE hi
+
+OPTIMIZE DUP LIT < UNTIL        WITH DUP_LIT_CMP_UNTIL  ASSEMBLE lt
+OPTIMIZE DUP LIT > UNTIL        WITH DUP_LIT_CMP_UNTIL  ASSEMBLE gt
+OPTIMIZE DUP LIT = UNTIL        WITH DUP_LIT_CMP_UNTIL  ASSEMBLE eq
+OPTIMIZE DUP LIT <> UNTIL       WITH DUP_LIT_CMP_UNTIL  ASSEMBLE ne
+OPTIMIZE DUP LIT - UNTIL        WITH DUP_LIT_CMP_UNTIL  ASSEMBLE ne
+OPTIMIZE DUP LIT XOR UNTIL      WITH DUP_LIT_CMP_UNTIL  ASSEMBLE ne
+OPTIMIZE DUP LIT U< UNTIL       WITH DUP_LIT_CMP_UNTIL  ASSEMBLE cc
+OPTIMIZE DUP LIT U> UNTIL       WITH DUP_LIT_CMP_UNTIL  ASSEMBLE hi
+
+OPTIMIZE 0= IF                  WITH TST_IF             ASSEMBLE eq
+OPTIMIZE 0<> IF                 WITH TST_IF             ASSEMBLE ne
+OPTIMIZE 0< IF                  WITH TST_IF             ASSEMBLE lt
+OPTIMIZE 0> IF                  WITH TST_IF             ASSEMBLE gt
+
+OPTIMIZE DUP 0= IF              WITH DUP_TST_IF         ASSEMBLE eq
+OPTIMIZE DUP 0<> IF             WITH DUP_TST_IF         ASSEMBLE ne
+OPTIMIZE DUP IF                 WITH DUP_TST_IF         ASSEMBLE ne
+OPTIMIZE DUP 0< IF              WITH DUP_TST_IF         ASSEMBLE lt
+OPTIMIZE DUP 0> IF              WITH DUP_TST_IF         ASSEMBLE gt
+
+OPTIMIZE 0= WHILE               WITH TST_WHILE          ASSEMBLE eq
+OPTIMIZE 0<> WHILE              WITH TST_WHILE          ASSEMBLE ne
+OPTIMIZE 0< WHILE               WITH TST_WHILE          ASSEMBLE lt
+OPTIMIZE 0> WHILE               WITH TST_WHILE          ASSEMBLE gt
+
+OPTIMIZE DUP 0= WHILE           WITH DUP_TST_WHILE      ASSEMBLE eq
+OPTIMIZE DUP 0<> WHILE          WITH DUP_TST_WHILE      ASSEMBLE ne
+OPTIMIZE DUP WHILE              WITH DUP_TST_WHILE      ASSEMBLE ne
+OPTIMIZE DUP 0< WHILE           WITH DUP_TST_WHILE      ASSEMBLE lt
+OPTIMIZE DUP 0> WHILE           WITH DUP_TST_WHILE      ASSEMBLE gt
+
+OPTIMIZE 0= UNTIL               WITH TST_UNTIL          ASSEMBLE eq
+OPTIMIZE 0<> UNTIL              WITH TST_UNTIL          ASSEMBLE ne
+OPTIMIZE 0< UNTIL               WITH TST_UNTIL          ASSEMBLE lt
+OPTIMIZE 0> UNTIL               WITH TST_UNTIL          ASSEMBLE gt
+
+OPTIMIZE DUP 0= UNTIL           WITH DUP_TST_UNTIL      ASSEMBLE eq
+OPTIMIZE DUP 0<> UNTIL          WITH DUP_TST_UNTIL      ASSEMBLE ne
+OPTIMIZE DUP UNTIL              WITH DUP_TST_UNTIL      ASSEMBLE ne
+OPTIMIZE DUP 0< UNTIL           WITH DUP_TST_UNTIL      ASSEMBLE lt
+OPTIMIZE DUP 0> UNTIL           WITH DUP_TST_UNTIL      ASSEMBLE gt
+
+\ ---------------------------------------------------------------------
+\ Simple rules
+\ ---------------------------------------------------------------------
+
+OPTIMIZE DUP >R                 WITH DUP>R
+OPTIMIZE OVER >R                WITH OVER>R
+OPTIMIZE R> DROP                WITH RDROP
+OPTIMIZE 2R> 2DROP              WITH 2RDROP
+OPTIMIZE 0= INVERT              WITH 0<>
+OPTIMIZE = INVERT               WITH <>
+OPTIMIZE SWAP !                 WITH SWAP!
+OPTIMIZE SWAP H!                WITH SWAPH!
+OPTIMIZE DROP DROP              WITH 2DROP
+OPTIMIZE SWAP DROP              WITH NIP
+OPTIMIZE OVER OVER              WITH 2DUP
+OPTIMIZE DUP +                  WITH 2*
+OPTIMIZE OVER -                 WITH OVER-
+OPTIMIZE OVER +                 WITH OVER+
+OPTIMIZE ROT ROT                WITH -ROT
+OPTIMIZE -ROT ROT               WITH NOCODE
+OPTIMIZE ROT -ROT               WITH NOCODE
+OPTIMIZE DUP DROP               WITH NOCODE
+OPTIMIZE OVER DROP              WITH NOCODE
+OPTIMIZE >R R>                  WITH NOCODE
+OPTIMIZE R> >R                  WITH NOCODE
+OPTIMIZE R@ DROP                WITH NOCODE
+
+HOST
+\ ~ .RULES

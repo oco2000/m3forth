@@ -1,0 +1,1555 @@
+\
+\ ARMv7-M Thumb2 Assembler
+\
+
+BASE @ HEX
+
+VOCABULARY ASSEMBLER
+ALSO ASSEMBLER DEFINITIONS
+
+: NOOP ;
+
+\ Enumerations
+: ENUMERATE:  ( N start "name1" ... "nameN" -- )
+   DUP ROT + SWAP ?DO   I CONSTANT  LOOP ;
+
+: NAND ( x1 -- x2 )  INVERT AND ;
+: ?REGISTER   ( r -- )
+   0 10 WITHIN INVERT ABORT" Inavlid operand, need a register R0..R15" ;
+: ?LOW-REGISTER ( r -- r )
+    DUP 0 8 WITHIN INVERT ABORT" Inavlid operand, need a register R0..R7" ;
+: E_PSR ( f -- )
+    ABORT" Invalid operand, need special register" ;
+: ?PSR   ( r -- )
+    DUP 4 = E_PSR
+    DUP A 10 WITHIN E_PSR
+    15 80 WITHIN E_PSR
+;
+
+\ Register stack
+VARIABLE RSP
+5 CONSTANT #RMAX
+
+#RMAX CELLS CONSTANT RSLEN
+RSLEN ALLOT
+HERE CONSTANT RS0
+: REMPTY
+    RS0 RSP !
+    RS0 RSLEN - RSLEN ERASE  ;
+: RDEPTH
+    RS0 RSP @ - CELL / ;
+: RPUSH ( r -- )
+    RDEPTH #RMAX = ABORT" Too many register operands"
+    RSP @ CELL - DUP RSP ! ! ;
+: RPOP ( r -- )
+    RSP @ DUP CELL + DUP RS0 > ABORT" Register stack underflow" RSP ! @ ;
+
+: RSWAP ( -- )
+    RPOP RPOP SWAP RPUSH RPUSH ;
+
+: Nth ( n' -- r n )
+    CELLS RSP @ + @ ;
+
+: NthREG
+    CREATE ,
+    DOES>  ( -- reg ) @ Nth ;
+
+0 NthREG Rd
+1 NthREG Rn
+2 NthREG Rm
+3 NthREG Rt
+
+\ Registers
+
+VARIABLE IN_REGLIST
+FALSE IN_REGLIST !
+
+: REG: ( r n )
+    CREATE ,
+    DOES> @ IN_REGLIST @ INVERT IF RPUSH THEN ;
+
+: REGS:  10 0 DO  I REG: LOOP ;
+REGS: r0 r1 r2 r3 r4 r5 r6 r7 r8 r9 r10 r11 r12 r13 r14 r15
+0D REG: sp
+0E REG: lr
+0F REG: pc
+06 REG: tos  \ top of stack
+07 REG: fsp  \ data stack pointer
+00 REG: tmp  \ temp register
+01 REG: tmp1 \ temp register
+02 REG: tmp2 \ temp register
+03 REG: tmp3 \ temp register
+04 REG: tmp4 \ temp register
+08 REG: rambase \ ram base address
+
+\ Bit masks
+: BIT:  ( n "name" -- )   BIT CONSTANT ;
+: BITS: ( 0 bit1 ... bitN -- x )
+   0  BEGIN OVER OR  SWAP 0= UNTIL ;
+
+18 BIT: %P      A BIT: %P2
+17 BIT: %U      9 BIT: %U2
+15 BIT: %W      8 BIT: %W2
+14 BIT: %S
+
+\ Basic instruction creation, condition codes
+8 CONSTANT #VARIANTS   \ maximum number of variants of instructions
+
+VARIABLE INSTRUCTION
+VARIABLE IMM
+VARIABLE SHIFT
+VARIABLE SHIFT_TYPE
+VARIABLE WIDTH
+VARIABLE REGLIST
+VARIABLE WRITEBACK
+VARIABLE OFFSET_MODE
+VARIABLE CCODE
+VARIABLE ITBLOCK    \ 0 if not in it_block
+0 ITBLOCK !
+0 VALUE FAILED?
+0 VALUE NARROW?
+
+: in_it_block? ( -- f )
+    ITBLOCK @ 0> ;
+: last_or_not_in_it_block? ( -- f )
+    ITBLOCK @ 2 < ;
+
+: ?in_it_block
+    in_it_block? ABORT" Can not be inside IT block" ;
+
+\ condition codes
+: CC:  ( x "name" -- )  CREATE ,
+  DOES> @  ( -- mask )
+   CCODE ! ;
+
+00 CC: eq   01 CC: ne
+02 CC: cs   03 CC: cc
+04 CC: mi   05 CC: pl
+06 CC: vs   07 CC: vc
+08 CC: hi   09 CC: ls
+0A CC: ge   0B CC: lt
+0C CC: gt   0D CC: le
+0E CC: al   0F CC: nv
+02 CC: hs   03 CC: lo
+
+: ?al   ( -- f )
+    CCODE @ 0E = ;
+
+
+: NEW_VARIANT
+    0 INSTRUCTION !
+    FALSE TO FAILED?
+;
+0x77777778 CONSTANT NOCONST
+: NEW
+    REMPTY
+    NOCONST IMM !
+    NOCONST WIDTH !
+    NOCONST SHIFT !
+    NOCONST REGLIST !
+    0 SHIFT_TYPE !
+    FALSE WRITEBACK !
+    0 OFFSET_MODE !
+    al
+;
+: NARROW
+    TRUE TO NARROW? NEW_VARIANT ;
+: WIDE
+    FALSE TO NARROW? NEW_VARIANT ;
+: FAILED
+    TRUE TO FAILED? ;
+: ?FAILED!   ( f -- )
+    IF FAILED RDROP THEN ;
+: ?1FAILED!   ( f -- )
+    IF FAILED RDROP DROP THEN ;
+
+: ENCODE  ( x1 -- )   INSTRUCTION @  OR  INSTRUCTION ! ;
+
+: Reg!  ( narrow_shift wide_shift -- )
+    CREATE 2,
+    DOES> ( x -- )
+        2@
+        NARROW? IF DROP ELSE NIP THEN
+        LSHIFT ENCODE ;
+
+0  8 Reg! Rd!
+3 10 Reg! Rn!
+6  0 Reg! Rm!
+0  C Reg! Rt!
+
+: Rd2! ( reg -- )
+    DUP 7 AND ENCODE
+    8 AND 4 LSHIFT ENCODE ;
+
+: Rn2! ( reg -- )
+    3 LSHIFT ENCODE ;
+
+: Rt2! ( reg -- )
+    8 LSHIFT ENCODE ;
+
+: RdLo8! ( reg -- )
+    8 LSHIFT ENCODE ;
+
+: RLo?  ( reg -- f )
+    0 8 WITHIN ;
+
+: RegLo!    ( "reg" "reg!" )
+    CREATE ' , ' ,
+    DOES> 2@
+        EXECUTE DUP RLo? IF SWAP EXECUTE ELSE 2DROP FAILED THEN ;
+
+RegLo!  ?RdLo   Rd Rd!
+RegLo!  ?RdLo8  Rd RdLo8!
+RegLo!  ?RnLo   Rn Rn!
+RegLo!  ?RmLo   Rm Rm!
+
+: ?Rd       Rd Rd! ;
+: ?Rn       Rn Rn! ;
+: ?Rm       Rm Rm! ;
+: ?Rt       Rt Rt! ;
+: ?RnRm     Rn Rn! Rn Rm! ;
+: ?Rd>Rn    Rd Rn! ;
+: ?Rd>Rm    Rd Rm! ;
+: ?Rd>Rt    Rd Rt! ;
+: ?Rd>Rt2   Rn Rt2! ;
+: ?Rn>Rm    Rn Rm! ;
+: ?Rn>Rd    Rn Rd! ;
+: ?Rn>Rt    Rn Rt! ;
+: ?Rm>Rn    Rm Rn! ;
+: ?Rm>Rt    Rm Rt! ;
+: ?Rt>Rm    Rt Rm! ;
+: ?Rn>Rt2   Rn Rt2! ;
+: ?Rd>Rd2   Rd Rd2! ;
+: ?Rn>Rn2   Rn Rn2! ;
+: ?Rd>Rn2   Rd Rn2! ;  \ 1 register, narrow, Rm
+
+: ?WIDTH ( n m -- f )
+    0 SWAP WITHIN ;
+
+: ?imm
+    IMM @ NOCONST = IF FAILED THEN ;
+
+: i! ( n -- )
+    NARROW? IF DROP FAILED ELSE 1A LSHIFT ENCODE THEN ;
+: i2shift! ( n -- )
+    NARROW? ?1FAILED!
+    DUP 2 BIT ?WIDTH INVERT ?1FAILED!
+    4 LSHIFT ENCODE
+;
+: i3! ( n -- )
+    NARROW? IF 6 LSHIFT ENCODE ELSE DROP FAILED THEN ;
+: i3const! ( n -- )
+    NARROW? IF DROP FAILED ELSE 0C LSHIFT ENCODE THEN ;
+: i4! ( n -- )
+    ENCODE ;
+: i5! ( n -- )
+    NARROW? IF 6 ELSE 0 THEN LSHIFT ENCODE ;
+: i5shift! ( n -- )
+    NARROW? IF 6 LSHIFT ELSE
+        DUP 3 AND 6 LSHIFT ENCODE
+        1C AND A LSHIFT
+    THEN  ENCODE ;
+: i6! ( n -- )
+    NARROW? IF
+        DUP 1F AND 3 LSHIFT ENCODE
+        20 AND 4 LSHIFT ENCODE
+    ELSE DROP FAILED
+    THEN ;
+: i7! ( n -- )
+    ENCODE ;
+: i8! ( n -- )
+    ENCODE ;
+: i12! ( n -- )
+    NARROW? IF DROP FAILED ELSE
+        DUP 0FF AND ENCODE \ i8
+        DUP 0700 AND 4 LSHIFT ENCODE
+            0800 AND F LSHIFT ENCODE
+    THEN ;
+: i16! ( n -- )
+    NARROW? IF DROP FAILED ELSE
+        DUP i12!
+        F000 AND 4 LSHIFT ENCODE
+    THEN ;
+
+: ?i5*2
+    ?imm
+    IMM @ 1 AND ?FAILED!
+    IMM @ 1 RSHIFT DUP 5 BIT ?WIDTH IF i5! ELSE DROP FAILED THEN
+;
+
+: ?i5*4
+    ?imm
+    IMM @ 3 AND ?FAILED!
+    IMM @ 2 RSHIFT DUP 5 BIT ?WIDTH IF i5! ELSE DROP FAILED THEN
+;
+
+: ?i7*4
+    ?imm
+    IMM @ 3 AND ?FAILED!
+    IMM @ 2 RSHIFT DUP 7 BIT ?WIDTH IF i7! ELSE DROP FAILED THEN
+;
+
+: ?i8*4
+    ?imm
+    IMM @ 3 AND ?FAILED!
+    IMM @ 2 RSHIFT DUP 8 BIT ?WIDTH IF i8! ELSE DROP FAILED THEN
+;
+
+: ?-i8
+    ?imm
+    IMM @ DUP 0> ?1FAILED!
+    NEGATE DUP 8 BIT ?WIDTH INVERT ?1FAILED!
+    ENCODE
+;
+
+
+: offset ( -- offset )
+    IMM @ THERE - 4 - ;
+
+: offset_aligned ( -- offset )
+    IMM @ THERE DUP TALIGNED? INVERT IF TALIGNED 4 - THEN - 4 - ;
+
+: ?-label12
+    ?imm
+    offset_aligned DUP 0< IF
+        NEGATE DUP 12 BIT ?WIDTH IF i12! ELSE DROP FAILED THEN
+    ELSE DROP FAILED THEN ;
+
+: ?+label12
+    ?imm
+    offset_aligned DUP 0> IF
+        DUP 12 BIT ?WIDTH IF i12! ELSE DROP FAILED THEN
+    ELSE DROP FAILED THEN ;
+
+: ?+-label12
+    ?imm
+    offset_aligned DUP 0< DUP IF SWAP NEGATE SWAP THEN INVERT ( imm U )
+    %U AND ENCODE
+    DUP 12 BIT ?WIDTH INVERT ?1FAILED!
+    ENCODE
+;
+
+: ?+-label8*4
+    ?imm
+    offset_aligned DUP 0< DUP IF SWAP NEGATE SWAP THEN INVERT ( imm U )
+    %U AND ENCODE
+    DUP 3 AND  ?1FAILED!
+    DUP 12 BIT ?WIDTH INVERT ?1FAILED!
+    2 RSHIFT DUP 8 BIT ?WIDTH INVERT ?1FAILED!
+    i8!
+;
+
+: ?+label8*4
+    ?imm
+    offset_aligned  DUP 0< ?1FAILED!
+    DUP 3 AND  ?1FAILED!
+    2 RSHIFT DUP 8 BIT ?WIDTH INVERT ?1FAILED!
+    i8!
+;
+
+: ?+label6*2
+    ?imm
+    offset DUP 0< ?1FAILED!
+    1 RSHIFT DUP 6 BIT ?WIDTH INVERT ?1FAILED!
+    i6!
+;
+
+: ?width
+    ?imm
+    WIDTH @ NOCONST = ?FAILED!
+    IMM @ 0 20 WITHIN INVERT ?FAILED!
+    WIDTH @ 1 IMM @ \ lsb
+    21 SWAP - WITHIN INVERT ?FAILED!
+    IMM @ WIDTH @ + 1- 1F AND ENCODE
+;
+
+: ?widthm1
+    ?imm
+    WIDTH @ NOCONST = ?FAILED!
+    IMM @ 0 20 WITHIN INVERT ?FAILED!
+    WIDTH @ 1 20 IMM @ - WITHIN INVERT ?FAILED!
+    WIDTH @ 1- 1F AND ENCODE
+;
+
+: Imm!    ( width "ix!" -- )
+    CREATE , ' ,
+    DOES> 2@ ?imm
+        IMM @ DUP ROT BIT ?WIDTH IF SWAP EXECUTE ELSE 2DROP FAILED THEN ;
+
+3  Imm!       ?i3    i3!
+4  Imm!       ?i4    i4!
+5  Imm!       ?i5    i5!
+8  Imm!       ?i8    i8!
+C  Imm!      ?i12   i12!
+C  Imm!      ?i12_2  ENCODE
+10 Imm!      ?i16   i16!
+
+: cond!
+    CCODE @ NARROW? IF 8 ELSE 16 THEN LSHIFT ENCODE ;
+
+: ?noimm
+    IMM @ NOCONST <> IF FAILED THEN ;
+
+: ?noshift
+    SHIFT @ NOCONST <> IF FAILED THEN ;
+
+\ Register lists
+: {  ( -- mark )  77777777 TRUE IN_REGLIST ! ;
+: }  ( mark reg1 .. regN -- reglist )
+   0 BEGIN OVER 77777777 <> WHILE
+     OVER ?REGISTER SWAP BIT OR
+   REPEAT  NIP REGLIST !
+   FALSE IN_REGLIST ! ;
+
+: ?reglist_lo
+    REGLIST @ NOCONST = ?FAILED!
+    REGLIST @ FF > ?FAILED!
+    REGLIST @ 0= ?FAILED!
+    REGLIST @ i8!
+;
+
+: ?reglist_lo&pc
+    REGLIST @ NOCONST = ?FAILED!
+    REGLIST @ 80FF INVERT AND ?FAILED!
+    REGLIST @ 0= ?FAILED!
+    REGLIST @ DUP FF AND i8!
+    8000 AND 7 RSHIFT ENCODE
+;
+
+: ?reglist_lo&lr
+    REGLIST @ NOCONST = ?FAILED!
+    REGLIST @ 40FF INVERT AND ?FAILED!
+    REGLIST @ 0= ?FAILED!
+    REGLIST @ DUP FF AND i8!
+    4000 AND 6 RSHIFT ENCODE
+;
+
+: ?reglist
+    REGLIST @ NOCONST = ?FAILED!
+    REGLIST @ FFFF > ?FAILED!
+    REGLIST @ ENCODE
+;
+
+: ?2regs_inlist
+    REGLIST @ 1s 2 < ?FAILED!
+;
+
+: ?pclr!inlist
+    REGLIST @ C000 AND C000 = ?FAILED!
+;
+
+: ?sp!inlist
+    REGLIST @ 2000 AND ?FAILED!
+;
+
+: ?pc!inlist
+    REGLIST @ 8000 AND ?FAILED!
+;
+
+: ?pc_inlist&last_it
+    REGLIST @ 8000 AND 0<>
+    last_or_not_in_it_block? INVERT AND ?FAILED!
+;
+
+: ?w_Rd_!inlist
+    WRITEBACK @
+    Rd 1 SWAP LSHIFT REGLIST @ AND
+    AND ?FAILED!
+;
+
+: ?!it
+    in_it_block? ?FAILED! ;
+
+: ?lastIt
+    last_or_not_in_it_block? INVERT ?FAILED! ;
+
+: ?Rd!pc!lastIt
+    Rd 0F =
+    last_or_not_in_it_block? INVERT AND ?FAILED!
+;
+
+: ?Rd!sp!lastIt
+    Rd 0D =
+    last_or_not_in_it_block? INVERT AND ?FAILED!
+;
+
+: ?aligned
+    THERE TALIGNED? INVERT ABORT" Must be at aligned address"
+;
+
+: #
+    IMM ! ;
+
+: #width
+    WIDTH ! ;
+
+: !!
+    TRUE WRITEBACK ! ;
+
+\ Special Registers
+: PSR:
+    CREATE ,
+    DOES> @ # ;
+
+ 0 PSR: APSR
+ 1 PSR: IAPSR
+ 2 PSR: EAPSR
+ 3 PSR: XPSR
+ 5 PSR: IPSR
+ 6 PSR: EPSR
+ 7 PSR: IEPSR
+ 8 PSR: MSP
+ 9 PSR: PSP
+10 PSR: PRIMASK
+11 PSR: BASEPRI
+12 PSR: BASEPRI_MAX
+13 PSR: FAULTMASK
+14 PSR: CONTROL
+
+: ?spec_reg ( -- )
+    ?imm
+    IMM @ DUP ?PSR ENCODE ;
+
+
+: OFFSET:
+    CREATE BITS: ,
+    DOES>
+        @ OFFSET_MODE !
+        IMM @ NOCONST = IF 0 IMM ! THEN
+;
+
+: [[ POSTPONE [ ; IMMEDIATE \ redefine forth [
+: ]] ] ; \ redefine forth ]
+: [ ;
+
+0 %P2 %U2      OFFSET: +]   \ pre-index
+0 %P2          OFFSET: -]   \ pre-index
+0 %P2 %U2 %W2  OFFSET: +]!  \ pre-index + writeback
+0 %P2     %W2  OFFSET: -]!  \ pre-index + writeback
+0     %U2 %W2  OFFSET: ]+   \ post-index + writeback
+0         %W2  OFFSET: ]-   \ post-index + writeback
+0     %U2      OFFSET: ]    \ post-index
+
+
+: MODE2?:
+    CREATE ,
+    DOES> @ OFFSET_MODE @ AND ;
+
+%P2 MODE2?: P2?
+%U2 MODE2?: U2?
+%W2 MODE2?: W2?
+
+: ?offset
+    OFFSET_MODE @ DUP 0= ?1FAILED! ENCODE
+    ?i8
+;
+
+: mode2>mode1 ( -- mode1 )
+    0 P2? IF %P OR THEN
+      U2? IF %U OR THEN
+      W2? IF %W OR THEN
+;
+
+: ?offset2
+    OFFSET_MODE @ 0= ?FAILED! ( offest_mode )
+    mode2>mode1 ENCODE
+    ?i8*4
+;
+
+: ?P2&W2!0
+    P2? 0= W2? 0= AND ?FAILED!
+;
+
+: ?W2
+    W2? ?FAILED!
+;
+
+: ?P2!1U2!1W2!0
+    P2? 0<> U2? 0<> AND W2? 0= AND ?FAILED!
+;
+
+: ?W2!Rd!Rn
+    Rd Rn = W2? AND ?FAILED!
+;
+
+: ?W2!Rd!Rn!Rm
+    Rd Rn = Rd Rm = OR W2? AND ?FAILED!
+;
+
+: ?!offset
+    OFFSET_MODE @ ?FAILED! ;
+
+\ Modified immediate constants in Thumb instructions
+0 VALUE X
+: BYTE  ( n -- )
+    X SWAP 8 * RSHIFT FF AND ;
+
+: MSB   ( x -- x n )
+    0 BEGIN
+        OVER 0< INVERT
+    WHILE
+        1+ SWAP 1 LSHIFT SWAP
+    REPEAT
+;
+
+: #const ( x -- i imm3 abcdefgh T | F )
+    DUP IF TO X
+        X 0xFFFFFF00 AND 0=                                         IF 0 0  0 BYTE TRUE EXIT THEN
+        0 BYTE 2 BYTE =  X 0xFF00FF00 AND 0= AND                    IF 0 1  0 BYTE TRUE EXIT THEN
+        1 BYTE 3 BYTE =  X 0x00FF00FF AND 0= AND                    IF 0 2  1 BYTE TRUE EXIT THEN
+        0 BYTE 1 BYTE =  2 BYTE 3 BYTE = AND  1 BYTE 2 BYTE = AND   IF 0 3  0 BYTE TRUE EXIT THEN
+        X MSB OVER 0x00FFFFFF AND 0= IF
+            8 + ( x' i:imm3:a )
+            DUP 1 AND 7 LSHIFT ROT 18 RSHIFT 7F AND OR ( i:imm3:a i8 )
+            >R 1 RSHIFT DUP 8 AND 3 RSHIFT SWAP 7 AND R> TRUE
+        ELSE
+            2DROP FALSE
+        THEN
+    THEN
+;
+
+: ?const
+    IMM @ #const IF
+        i8! i3const! i!
+    ELSE
+        FAILED
+    THEN
+;
+
+\ restrictions
+
+: ?RegRestriction!
+    CREATE  ' , ,
+    DOES> 2@ EXECUTE = IF FAILED THEN ;
+
+: ?RegRestriction=
+    CREATE  ' , ,
+    DOES> 2@ EXECUTE <> IF FAILED THEN ;
+
+0D ?RegRestriction! ?Rd!sp Rd
+0D ?RegRestriction! ?Rn!sp Rn
+0D ?RegRestriction! ?Rm!sp Rm
+0D ?RegRestriction! ?Rt!sp Rt
+0F ?RegRestriction! ?Rd!pc Rd
+0F ?RegRestriction! ?Rn!pc Rn
+0F ?RegRestriction! ?Rm!pc Rm
+0F ?RegRestriction! ?Rt!pc Rt
+
+0D ?RegRestriction= ?Rd=sp Rd
+0D ?RegRestriction= ?Rn=sp Rn
+0D ?RegRestriction= ?Rm=sp Rm
+
+: ?Rd!sp!pc     ?Rd!sp ?Rd!pc ;
+: ?Rn!sp!pc     ?Rn!sp ?Rn!pc ;
+: ?Rm!sp!pc     ?Rm!sp ?Rm!pc ;
+: ?all!sp       ?Rd!sp ?Rn!sp ?Rm!sp ?Rt!sp ;
+: ?all!pc       ?Rd!pc ?Rn!pc ?Rm!pc ?Rt!pc ;
+: ?all!sp!pc    ?all!sp ?all!pc ;
+: ?Rm!Rn        Rm Rn = IF FAILED THEN ;
+: ?Rd!Rn        Rd Rn = IF FAILED THEN ;
+: ?Rd!Rm        Rd Rm = IF FAILED THEN ;
+
+\ shifts
+: ?SHIFT ( x1 -- x1 )
+    DUP
+    SHIFT_TYPE @ CASE
+    00 OF 0 20 ENDOF
+    01 OF 1 21 ENDOF
+    02 OF 1 21 ENDOF
+    03 OF 0 20 ENDOF
+    ENDCASE
+    WITHIN 0= IF FAILED THEN 1F AND ;
+
+: ?SAT_SHIFT ( x1 -- x1 )
+    DUP
+    SHIFT_TYPE @ CASE
+    00 OF 0 20  ENDOF
+    01 OF -2 -2 ENDOF
+    02 OF 1 21  ENDOF
+    03 OF -2 -2 ENDOF
+    ENDCASE
+    WITHIN 0= IF FAILED THEN 1F AND ;
+
+: #SHIFT: ( mask "name" -- )  CREATE ,
+  DOES> @  ( shift mask -- )
+    SHIFT_TYPE ! SHIFT ! ;
+: RSHIFT:  ( mask "name" -- )  CREATE ,
+   DOES> @  ( n-reg 'register' mask --  operand 'shifted' )
+    SHIFT_TYPE ! ;
+
+00 DUP #SHIFT: #lsl  RSHIFT: ,lsl
+01 DUP #SHIFT: #lsr  RSHIFT: ,lsr
+02 DUP #SHIFT: #asr  RSHIFT: ,asr
+03 DUP #SHIFT: #ror  RSHIFT: ,ror
+: #rrx
+    03 SHIFT_TYPE ! 0 SHIFT ! ;
+: ,rrx   #rrx ;
+
+: ?shift    ( -- )
+    SHIFT @ DUP NOCONST = IF DROP 0 THEN ?SHIFT
+    DUP 3 AND 6 LSHIFT ENCODE
+    1C AND 0A LSHIFT ENCODE
+    SHIFT_TYPE @ DUP 0 4 WITHIN IF
+        4 LSHIFT ENCODE
+    ELSE
+        DROP FAILED
+    THEN
+;
+
+: ?i5shift
+    IMM @ ?SHIFT i5shift!
+;
+
+: ?sat_shift
+    ?i5
+    SHIFT @ DUP NOCONST = IF DROP 0 THEN
+    ?SAT_SHIFT i5shift!
+;
+
+: ?lsl2
+    SHIFT_TYPE @ 0 <> ?FAILED!
+    SHIFT @ DUP NOCONST = IF DROP 0 THEN i2shift!
+;
+
+: ?rot*8
+    SHIFT_TYPE @ 03 <> ?FAILED!
+    SHIFT @ DUP NOCONST = IF DROP 0 THEN
+    DUP 3 AND ?1FAILED!
+    3 RSHIFT DUP 2 BIT ?WIDTH IF i2shift! ELSE DROP FAILED THEN
+;
+
+: %S!
+    %S ENCODE ;
+
+: %W!
+    %W WRITEBACK @ AND ENCODE ;
+
+: TCOMPILE, ( instruction -- )
+    DUP 0xB500 = IF 1 ELSE 0 THEN DWARF_LINE \ push {lr} - it is a subprogram prologue
+    NARROW? IF TINSTRN, ELSE TINSTRW, THEN
+    ITBLOCK @ 1- 0 MAX ITBLOCK ! ;
+
+: ICOMPILE, ( -- )
+    INSTRUCTION @ TCOMPILE,
+;
+
+\ Branch offsets
+
+: WIDE_OFFSET_LONG   ( offset - mask )
+    DUP 800000 AND 0= IF \ J1, J2
+        600000 XOR
+    THEN
+    DUP 7FF AND \ i11
+    OVER 1FF800 AND 5 LSHIFT OR \ i10
+    OVER 200000 AND A RSHIFT OR \ J2
+    OVER 400000 AND 9 RSHIFT OR \ J1
+    SWAP 800000 AND 3 LSHIFT OR \ S
+;
+
+: WIDE_OFFSET   ( offset - mask )
+    DUP 800000 AND 0= IF \ J1, J2
+        600000 XOR
+    THEN
+    DUP 7FF AND \ i11
+    OVER 1F800 AND 5 LSHIFT OR \ i6
+    OVER 20000 AND 6 RSHIFT OR \ J2
+    OVER 40000 AND 5 RSHIFT OR \ J1
+    SWAP 80000 AND 7 LSHIFT OR \ S
+;
+
+2 80000000
+ENUMERATE: FORWARD BACKWARD
+
+: ?OFFSET_ALIGNED ( offest -- )
+    1 AND ABORT" Branch destination not 2 byte-aligned" ;
+
+0
+CELL -- offest_lo
+CELL -- offset_hi
+CELL -- offset_instr_length
+CELL -- offset_mask
+CELL -- offset_bits
+DROP
+
+: ?BRANCH-OFFSET: ( low hi length mask -- )
+    CREATE 2SWAP SWAP 2, SWAP 2, ' ,
+    DOES> ( src dest  -- bits ) >R
+        SWAP R@ offset_instr_length @ + - ( offset )
+        DUP R@ offest_lo @ R@ offset_hi @ WITHIN 0= ABORT" Branch destination out of range"
+        DUP ?OFFSET_ALIGNED
+        1 RSHIFT R@ offset_mask @ AND
+        R> offset_bits @ EXECUTE
+;
+\ TODO is len unnessesary?
+\      lo       hi len   mask
+     -100      0FF  4     0FF ?BRANCH-OFFSET:   BRANCH-OFFSET_NARROW    NOOP
+     -800      7FF  4    07FF ?BRANCH-OFFSET:   BRANCH-OFFSET_I11       NOOP    \ unconditional
+  -100000   0FFFFF  4  0FFFFF ?BRANCH-OFFSET:   BRANCH-OFFSET           WIDE_OFFSET
+ -1000000  0FFFFFF  4 0FFFFFF ?BRANCH-OFFSET:   BRANCH-OFFSET_LONG      WIDE_OFFSET_LONG    \ unconditional
+
+: BWIDE,   ( addr -- )
+    WIDE THERE SWAP
+    ?al IF ( al condition undefined in wide b<c> )
+        BRANCH-OFFSET_LONG  ENCODE
+        F0009000
+    ELSE    \   conditional
+        BRANCH-OFFSET  ENCODE
+        cond! F0008000
+    THEN ENCODE ICOMPILE, NEW
+;
+
+: BNARROW,   ( addr -- )
+    NARROW THERE SWAP
+    ?al IF ( al condition undefined in short b<c> )
+        BRANCH-OFFSET_I11  ENCODE
+        E000    \ use unconditional branch with i11 offset
+    ELSE    \ conditional
+        BRANCH-OFFSET_NARROW  ENCODE
+        cond! D000
+    THEN ENCODE ICOMPILE, NEW
+;
+
+: A<MARK  ( -- addr 'backward' )  THERE BACKWARD ;
+: A<RESOLVE  ( addr 'backward' -- addr )
+    BACKWARD <> ABORT" Expect assembler backward reference on stack"
+    DUP THERE SWAP - ( addr offset )
+    ?al IF \ unconditional
+        800 < IF \ I11
+            BNARROW,
+        ELSE    \ long
+            BWIDE,
+        THEN
+    ELSE
+        100 < IF    \ narrow
+            BNARROW,
+        ELSE        \ wide
+            BWIDE,
+        THEN
+    THEN
+;
+: A>MARK  ( -- ADDR 'FORWARD' ADDR )  THERE FORWARD   OVER  ;
+
+: A>RESOLVE_NARROW  ( addr 'forward' -- )
+   FORWARD <> ABORT" Expect assembler forward reference on stack"
+   DUP  TW@ F000 AND D000 = IF \ i8 conditional?
+        DUP  THERE BRANCH-OFFSET_NARROW ( addr bits )
+        OVER TW@ FF00
+   ELSE \ i11 unconditional
+        DUP  THERE BRANCH-OFFSET_I11 ( addr bits )
+        OVER TW@ F800
+   THEN
+   AND  OR   SWAP TW! \ erase old jmp addr and encode the new one
+;
+
+: A>RESOLVE_WIDE  ( addr 'forward' -- )
+   FORWARD <> ABORT" Expect assembler forward reference on stack"
+   DUP  INSTR@ F8001000 AND F0000000 = IF \ conditional?
+        DUP  THERE BRANCH-OFFSET ( addr bits )
+        OVER INSTR@ FBC0D000
+   ELSE \ unconditional
+        DUP  THERE BRANCH-OFFSET_LONG ( addr bits )
+        OVER INSTR@ F800D000
+   THEN
+   AND   OR   SWAP INSTR! \ erase old jmp addr and encode the new one
+;
+
+\
+\ Labels and branch resolving
+\
+: ?condition
+    ?al ABORT" Condition needed!" ;
+
+: invert
+    ?al INVERT IF CCODE @ 1 XOR CCODE ! THEN ;
+
+: label     THERE CONSTANT ;
+: if-not    ?condition A>MARK BNARROW, ;
+: if-not.w  ?condition A>MARK BWIDE, ;
+: if        invert if-not ;
+: if.w      invert if-not.w ;
+: ahead     al if-not ;
+: ahead.w   al if-not.w ;
+: then      A>RESOLVE_NARROW ;
+: ?then     DUP FORWARD = IF A>RESOLVE_NARROW THEN ;
+: then.w    A>RESOLVE_WIDE ;
+: else      A>MARK al BNARROW,  2SWAP then ;
+: else.w    A>MARK al BWIDE,  2SWAP then.w ;
+: begin     A<MARK ;
+: until-not A<RESOLVE ;
+: until     invert A<RESOLVE ;
+: again     al until-not ;
+: while-not if-not ;
+: while-not.w  if-not.w ;
+: while     invert if-not ;
+: while.w   invert if-not.w ;
+: repeat    2SWAP  again  then ;
+: repeat.w  2SWAP  again  then.w ;
+: repeat-until-not  2SWAP  until-not  then ;
+
+
+\ ----------------------------------- instruction constructing
+
+: DROP-1 ( -1 n1 n2 ... nm -- )
+    BEGIN  -1 = UNTIL ;
+
+: ?INSTRUCTION, ( -1 mask1 ... maskn -- 0 mask1 ... maskn-1 | -- )
+    FAILED? IF
+        DROP
+    ELSE
+        NEW
+        ENCODE ICOMPILE,
+        DROP-1
+        RDROP
+    THEN
+;
+
+: E_UNPREDICTABLE
+    TRUE ABORT" UNPREDICTABLE!"
+;
+
+: ?regs
+    RDEPTH <> IF FAILED THEN ;
+
+: VARIANTS{
+    :NONAME
+;
+
+: }VARIANTS
+    POSTPONE E_UNPREDICTABLE POSTPONE ;
+; IMMEDIATE
+
+: OP{
+    -1 ;
+
+: OP'{
+    OP{ ' SWAP ;
+
+: COMPILE_OPCODES ( -1 mask1 ... maskn -- )
+    BEGIN DUP , -1 = UNTIL ;
+
+: EXTRACT_OPCODES ( a -- -1 mask1 ... maskn a' )
+        -1 SWAP
+        BEGIN ( -1 maskn .. maskx addr )
+            DUP @ -1 <>
+        WHILE
+            DUP @ SWAP CELL+
+        REPEAT
+;
+
+: }OP
+    CREATE  ( xt -1 mask1 ... maskn "name" -- )
+        COMPILE_OPCODES
+        ,
+    DOES>   ( -- )
+        EXTRACT_OPCODES
+        CELL+ @ EXECUTE
+;
+
+: }'OP
+    CREATE  ( xt' xt -1 mask1 ... maskn "name" -- )
+        COMPILE_OPCODES
+        2,
+    DOES>   ( -- )
+        EXTRACT_OPCODES
+        CELL+ 2@ EXECUTE EXECUTE
+;
+
+: WIDE_OP:
+    CREATE ,
+    DOES> WIDE @ TCOMPILE, NEW
+;
+
+: NARROW_OP:
+    CREATE ,
+    DOES> NARROW @ TCOMPILE, NEW
+;
+
+0 VALUE itmask
+: IT_OP:
+    CREATE 2,
+    DOES>
+        ?in_it_block
+        ?condition 2@ TO itmask ( count )
+        DUP 0 ?DO
+            CCODE @ 1 AND           \ get firstcond[0]
+            itmask I LSHIFT 8 AND   \ get current bit in mask
+            0= IF 1 XOR THEN        \ invert firstcond[0] if bit in mask is 1
+            3 I - LSHIFT            \ shift to position
+            1 3 I - LSHIFT INVERT   \ get mask to clear current bit in mask
+            itmask AND              \ clear bit
+            OR TO itmask            \ combine with new bit
+        LOOP
+        itmask CCODE @ 4 LSHIFT OR 0BF00 OR NARROW TCOMPILE, NEW
+        1+ ITBLOCK !
+;
+
+: %WIDE_SHIFT
+    3 ?regs ?Rd   ?Rn   ?Rm  ?shift     ?all!sp!pc ;
+
+: .FAILED
+    FAILED? .
+;
+
+\ ========================================== mnemonics ================================================
+\          Rd Rn Rm Rt const, shift etc    restrictions
+VARIANTS{
+    NARROW 2 ?regs ?RdLo ?RnLo ?noimm                                              ?INSTRUCTION,
+    WIDE   2 ?regs ?Rd   ?Rn   ?const      ?all!sp!pc                          %S! ?INSTRUCTION,
+    WIDE   %WIDE_SHIFT                                                         %S! ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP{ 0x4140 0xF1400000 0xEB400000 }OP adcs
+DUP OP{ 0x4000 0xF0000000 0xEA000000 }OP ands
+DUP OP{ 0x4380 0xF0200000 0xEA200000 }OP bics
+DUP OP{ 0x4040 0xF0800000 0xEA800000 }OP eors
+DUP OP{ 0x4300 0xF0400000 0xEA400000 }OP orrs
+DUP OP{ 0x4240 0xF1C00000 0xEBC00000 }OP rsbs
+    OP{ 0x4180 0xF1600000 0xEB600000 }OP sbcs
+
+VARIANTS{
+    WIDE   2 ?regs ?Rd   ?Rn   ?const      ?all!sp!pc                              ?INSTRUCTION,
+    WIDE   %WIDE_SHIFT                                                             ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP{ 0xF1400000 0xEB400000 }OP adc
+DUP OP{ 0xF0000000 0xEA000000 }OP and
+DUP OP{ 0xF0200000 0xEA200000 }OP bic
+DUP OP{ 0xF0800000 0xEA800000 }OP eor
+DUP OP{ 0xF0600000 0xEA600000 }OP orn
+DUP OP{ 0xF0400000 0xEA400000 }OP orr
+DUP OP{ 0xF1C00000 0xEBC00000 }OP rsb
+    OP{ 0xF1600000 0xEB600000 }OP sbc
+
+VARIANTS{
+    NARROW 2 ?regs ?RdLo ?RnLo ?i3                                                 ?INSTRUCTION,
+    NARROW 1 ?regs ?RdLo8 ?i8                                                      ?INSTRUCTION,
+    NARROW 3 ?regs ?RdLo ?RnLo ?RmLo ?noimm                                        ?INSTRUCTION,
+    WIDE   2 ?regs ?Rd   ?Rn   ?const      ?Rd!sp!pc ?Rn!pc                    %S! ?INSTRUCTION,
+    WIDE   %WIDE_SHIFT                                                         %S! ?INSTRUCTION,
+}VARIANTS
+
+DUP OP{ 0x1C00 0x3000 0x1800 0xF1000000 0xEB000000 }OP adds
+    OP{ 0x1E00 0x3800 0x1A00 0xF1A00000 0xEBA00000 }OP subs
+
+VARIANTS{
+    NARROW 2 ?regs ?Rd=sp ?Rn=sp ?i7*4                                             ?INSTRUCTION,
+    NARROW 2 ?regs ?RdLo8 ?Rn=sp ?i8*4                                              ?INSTRUCTION,
+    NARROW 2 ?regs ?Rd>Rd2  ?Rn>Rn2 ?noimm     ?Rd!sp!lastIt ?Rd!sp ?Rm!sp         ?INSTRUCTION,
+    WIDE   2 ?regs ?Rd   ?Rn   ?const          ?all!pc ?Rd!sp                      ?INSTRUCTION,
+    WIDE   %WIDE_SHIFT                                                             ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0xB000 0xA800 0x4400 0xF1000000 0xEB000000 }OP add
+
+VARIANTS{
+    WIDE   2 ?regs ?Rd   ?Rn   ?i12            ?Rd!sp!pc                           ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP{ 0xF2000000 }OP addw
+    OP{ 0xF2A00000 }OP subw
+
+VARIANTS{
+    NARROW 1 ?regs ?RdLo8 ?+label8*4                                               ?INSTRUCTION,
+    WIDE   1 ?regs ?Rd   ?-label12              ?Rd!sp!pc                          ?INSTRUCTION,
+    WIDE   1 ?regs ?Rd   ?+label12              ?Rd!sp!pc                          ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0xA000 0xF2AF0000 0xF20F0000 }OP adr
+
+VARIANTS{
+    NARROW 2 ?regs ?RdLo ?RnLo ?i5shift                                            ?INSTRUCTION,
+    NARROW 2 ?regs ?RdLo ?RnLo ?noimm                                              ?INSTRUCTION,
+    WIDE   2 ?regs ?Rd   ?Rn>Rm ?i5shift         ?all!sp!pc                    %S! ?INSTRUCTION,
+    WIDE   3 ?regs ?Rd   ?Rn   ?Rm               ?all!sp!pc                    %S! ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP'{ ,asr 0x1000 0x4100 0xEA4F0020 0xFA40F000 }'OP asrs
+DUP OP'{ ,lsl 0x0000 0x4080 0xEA4F0000 0xFA00F000 }'OP lsls
+    OP'{ ,lsr 0x0800 0x40C0 0xEA4F0010 0xFA20F000 }'OP lsrs
+
+VARIANTS{
+    WIDE   2 ?regs ?Rd   ?Rn>Rm ?i5shift         ?all!sp!pc                        ?INSTRUCTION,
+    WIDE   3 ?regs ?Rd   ?Rn   ?Rm               ?all!sp!pc                        ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP'{ ,asr 0xEA4F0020 0xFA40F000 }'OP asr
+DUP OP'{ ,lsl 0xEA4F0000 0xFA00F000 }'OP lsl
+DUP OP'{ ,lsr 0xEA4F0010 0xFA20F000 }'OP lsr
+    OP'{ ,ror 0xEA4F0030 0xFA60F000 }'OP ror
+
+VARIANTS{
+    WIDE   1 ?regs ?Rd   ?i5shift   ?width        ?all!sp!pc                       ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0xF36F0000 }OP bfc
+
+VARIANTS{
+    WIDE   2 ?regs ?Rd   ?Rn    ?i5shift ?width   ?Rd!sp!pc                        ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0xF3600000 }OP bfi
+
+VARIANTS{
+    NARROW   0 ?regs ?i8                                                           ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP{ 0xBE00 }OP bkpt
+    OP{ 0xDF00 }OP svc
+
+: bl   ( -- )
+    WIDE
+    IMM @ DUP NOCONST = ABORT" Label needed!"
+    THERE SWAP BRANCH-OFFSET_LONG ENCODE
+    F000D000 ENCODE
+    ICOMPILE, NEW
+;
+
+VARIANTS{
+    NARROW   1 ?regs  ?Rd>Rn2  ?noimm              ?Rd!pc ?lastIt                  ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP{ 0x4780 }OP blx
+    OP{ 0x4700 }OP bx
+
+VARIANTS{
+    WIDE   2 ?regs ?Rd   ?RnRm    ?noimm          ?all!sp!pc                      ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP{ 0xFAB0F080 }OP clz
+    OP{ 0xFA90F0A0 }OP rbit
+
+VARIANTS{
+    NARROW 1 ?regs  ?RdLo  ?+label6*2             ?!it                            ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0xB100 }OP cbz
+
+VARIANTS{
+    NARROW 1 ?regs  ?RdLo  ?+label6*2             ?!it                            ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0xB900 }OP cbnz
+
+VARIANTS{
+    NARROW 2 ?regs ?RdLo ?RnLo ?noimm ?noshift                                        ?INSTRUCTION,
+    WIDE   1 ?regs ?Rd>Rn         ?const          ?Rd!pc                              ?INSTRUCTION,
+    WIDE   2 ?regs ?Rd>Rn ?Rn>Rm  ?shift          ?all!pc ?Rd!sp                      ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0x42C0 0xF1100F00 0xEB100F00 }OP cmn
+
+VARIANTS{
+    NARROW 2 ?regs ?RdLo ?RnLo ?noimm ?noshift                                        ?INSTRUCTION,
+    NARROW 2 ?regs ?Rd>Rd2  ?Rn>Rn2  ?noimm ?noshift ?all!pc                          ?INSTRUCTION,
+    NARROW 1 ?regs ?RdLo8 ?i8                                                         ?INSTRUCTION,
+    WIDE   1 ?regs ?Rd>Rn         ?const      ?Rd!pc                                  ?INSTRUCTION,
+    WIDE   2 ?regs ?Rd>Rn ?Rn>Rm  ?shift      ?all!pc ?Rn!sp                          ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0x4280 0x4500 0x2800 0xF1B00F00 0xEBB00F00 }OP cmp
+
+VARIANTS{
+    WIDE   0 ?regs ?i4                                                                ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP{ 0xF3AF80F0 }OP dbg
+DUP OP{ 0xF3BF8F50 }OP dmb
+DUP OP{ 0xF3BF8F40 }OP dsb
+    OP{ 0xF3BF8F60 }OP isb
+
+VARIANTS{
+    NARROW 1 ?regs ?RdLo8 ?noimm ?noshift ?reglist_lo                                  ?INSTRUCTION,
+    WIDE   1 ?regs ?Rd>Rn ?noimm ?noshift ?reglist    ?Rd!pc ?2regs_inlist ?pclr!inlist ?sp!inlist ?pc_inlist&last_it ?w_Rd_!inlist  %W! ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP{ 0xC800 0xE8900000 }OP ldm
+    OP{ 0xC800 0xE8900000 }OP ldmia
+
+VARIANTS{
+    WIDE   1 ?regs ?Rd>Rn ?noimm ?noshift ?reglist    ?Rd!pc ?2regs_inlist ?pclr!inlist ?sp!inlist ?pc_inlist&last_it ?w_Rd_!inlist  %W! ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0xE9100000 }OP ldmdb
+
+VARIANTS{
+    NARROW   2 ?regs ?RdLo ?RnLo  ?noshift ?i5*4       ?W2                                             ?INSTRUCTION, \ immediate T1
+    NARROW   2 ?regs ?RdLo8       ?noshift ?i8*4       ?Rn=sp ?W2                                      ?INSTRUCTION, \ immediate T2
+    WIDE     2 ?regs ?Rd>Rt   ?Rn ?noshift ?offset     ?P2&W2!0 ?W2!Rd!Rn ?Rd!pc!lastIt ?Rn!pc         ?INSTRUCTION, \ immediate T4
+    WIDE     2 ?regs ?Rd>Rt   ?Rn ?noshift ?i12_2      ?Rd!pc!lastIt ?Rn!pc ?W2                        ?INSTRUCTION, \ immediate T3
+    NARROW   1 ?regs ?RdLo8   ?+label8*4 ?!offset                                                      ?INSTRUCTION, \ literal T1
+    WIDE     1 ?regs ?Rd>Rt       ?noshift ?!offset ?+-label12   ?Rd!pc!lastIt                         ?INSTRUCTION, \ literal T2
+    NARROW   3 ?regs ?RdLo ?RnLo  ?RmLo  ?noshift                                                      ?INSTRUCTION, \ register T1
+    WIDE     3 ?regs ?Rd>Rt ?Rn ?Rm ?lsl2              ?Rm!sp!pc ?Rn!pc ?Rd!pc!lastIt                  ?INSTRUCTION, \ register T2
+}VARIANTS ( xt )
+
+    OP{ 0x6800 0x9800 0xF8500800 0xF8D00000 0x4800 0xF85F0000 0x5800 0xF8500000 }OP ldr
+
+VARIANTS{
+    NARROW   2 ?regs ?RdLo ?RnLo  ?noshift ?i5         ?W2                                             ?INSTRUCTION, \ immediate T1
+    WIDE     2 ?regs ?Rd>Rt   ?Rn ?noshift ?offset     ?P2&W2!0 ?Rd!pc ?Rd!pc ?W2!Rd!Rn ?Rn!pc         ?INSTRUCTION, \ immediate T3
+    WIDE     2 ?regs ?Rd>Rt   ?Rn ?noshift ?i12_2      ?Rd!sp ?W2                                      ?INSTRUCTION, \ immediate T2
+    WIDE     1 ?regs ?Rd>Rt       ?noshift ?!offset ?+-label12  ?Rd!pc ?Rd!pc!lastIt                   ?INSTRUCTION, \ literal T1
+    NARROW   3 ?regs ?RdLo ?RnLo  ?RmLo  ?noshift                                                      ?INSTRUCTION, \ register T1
+    WIDE     3 ?regs ?Rd>Rt ?Rn ?Rm ?lsl2              ?Rd!sp!pc ?Rm!sp!pc                             ?INSTRUCTION, \ register T2
+}VARIANTS ( xt )
+
+    OP{ 0x7800 0xF8100800 0xF8900000 0xF81F0000 0x5C00 0xF8100000 }OP ldrb
+
+VARIANTS{
+    WIDE     2 ?regs ?Rd>Rt   ?Rn ?noshift ?i8         ?Rd!sp!pc ?Rn!pc                                ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP{ 0xF8100E00 }OP ldrbt
+DUP OP{ 0xF8300E00 }OP ldrht
+DUP OP{ 0xF9100E00 }OP ldrsbt
+DUP OP{ 0xF9300E00 }OP ldrsht
+DUP OP{ 0xF8500E00 }OP ldrt
+DUP OP{ 0xF8000E00 }OP strbt
+DUP OP{ 0xF8200E00 }OP strht
+    OP{ 0xF8400E00 }OP strt
+
+VARIANTS{
+    WIDE     3 ?regs ?Rd>Rt ?Rn>Rt2 ?Rm>Rn ?noshift ?aligned ?offset2    ?P2&W2!0 ?all!pc ?W2!Rd!Rn!Rm ?Rn!sp ?Rm!sp ?Rm!Rn     ?INSTRUCTION,
+    WIDE     2 ?regs ?Rd>Rt ?Rn>Rt2        ?noshift ?aligned ?+-label8*4 ?all!sp!pc ?Rd!Rn                                      ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0xE8500000 0xE95F0000 }OP ldrd
+
+VARIANTS{
+    WIDE     2 ?regs ?Rd>Rt ?Rn    ?noshift ?i8*4       ?all!pc ?Rd!sp                                                ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0xE8500F00 }OP ldrex
+
+VARIANTS{
+    WIDE     2 ?regs ?Rd>Rt ?Rn    ?noshift             ?all!pc ?Rd!sp                                                ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP{ 0xE8D00F4F }OP ldrexb
+    OP{ 0xE8D00F5F }OP ldrexh
+
+VARIANTS{
+    NARROW   2 ?regs ?RdLo ?RnLo  ?noshift ?i5*2       ?W2                                             ?INSTRUCTION, \ immediate T1
+    WIDE     2 ?regs ?Rd>Rt   ?Rn ?noshift ?offset     ?P2&W2!0 ?P2!1U2!1W2!0 ?Rd!sp!pc ?W2!Rd!Rn      ?INSTRUCTION, \ immediate T3
+    WIDE     2 ?regs ?Rd>Rt   ?Rn ?noshift ?i12_2      ?all!pc ?Rd!sp ?W2                              ?INSTRUCTION, \ immediate T2
+    WIDE     1 ?regs ?Rd>Rt       ?noshift ?!offset ?+-label12  ?Rd!sp!pc                              ?INSTRUCTION, \ literal T1
+    NARROW   3 ?regs ?RdLo ?RnLo  ?RmLo  ?noshift                                                      ?INSTRUCTION, \ register T1
+    WIDE     3 ?regs ?Rd>Rt ?Rn ?Rm ?lsl2              ?all!pc ?Rd!sp ?Rm!sp                           ?INSTRUCTION, \ register T2
+}VARIANTS ( xt )
+
+    OP{ 0x8800 0xF8300800 0xF8B00000 0xF83F0000 0x5A00 0xF8300000 }OP ldrh
+
+VARIANTS{
+    WIDE     2 ?regs ?Rd>Rt   ?Rn ?noshift ?offset     ?P2&W2!0 ?P2!1U2!1W2!0 ?all!pc ?Rd!sp ?W2!Rd!Rn ?INSTRUCTION, \ immediate T2
+    WIDE     2 ?regs ?Rd>Rt   ?Rn ?noshift ?i12_2      ?all!pc  ?Rd!sp ?W2                             ?INSTRUCTION, \ immediate T1
+    WIDE     1 ?regs ?Rd>Rt       ?noshift ?!offset ?+-label12  ?Rd!sp!pc                              ?INSTRUCTION, \ literal T1
+    NARROW   3 ?regs ?RdLo ?RnLo  ?RmLo  ?noshift                                                      ?INSTRUCTION, \ register T1
+    WIDE     3 ?regs ?Rd>Rt ?Rn ?Rm ?lsl2              ?all!pc ?Rd!sp ?Rm!sp                           ?INSTRUCTION, \ register T2
+}VARIANTS ( xt )
+
+DUP OP{ 0xF9100800 0xF9900000 0xF91F0000 0x5600 0xF9100000 }OP ldrsb
+    OP{ 0xF9300800 0xF9B00000 0xF93F0000 0x5E00 0xF9300000 }OP ldrsh
+
+VARIANTS{
+    WIDE     4 ?regs ?Rd ?Rn ?Rm ?Rt        ?all!sp!pc                             ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP{ 0xFB000000 }OP mla
+    OP{ 0xFB000010 }OP mls
+
+VARIANTS{
+    NARROW 1 ?regs ?RdLo8 ?i8                                                      ?INSTRUCTION,
+    WIDE   1 ?regs ?Rd    ?const            ?Rd!sp!pc                          %S! ?INSTRUCTION,
+    NARROW 2 ?regs ?RdLo  ?RnLo ?noimm ?!it                                        ?INSTRUCTION,
+    WIDE   2 ?regs ?Rd    ?Rn>Rm            ?all!sp!pc                         %S! ?INSTRUCTION,
+}VARIANTS
+
+    OP{ 0x2000 0xF04F0000 0x0000 0xEA4F0000 }OP movs
+
+VARIANTS{
+    WIDE   1 ?regs ?Rd    ?const            ?Rd!sp!pc                              ?INSTRUCTION,
+    NARROW 2 ?regs ?Rd>Rd2 ?Rn>Rn2    ?noimm ?noshift ?Rd!pc!lastIt                ?INSTRUCTION,
+    WIDE   2 ?regs ?Rd    ?Rn>Rm            ?all!sp!pc                             ?INSTRUCTION,
+}VARIANTS
+
+    OP{ 0xF04F0000 0x4600 0xEA4F0000 }OP mov
+
+VARIANTS{
+    WIDE   1 ?regs ?Rd    ?i16        ?Rd!sp!pc                                    ?INSTRUCTION,
+}VARIANTS
+
+DUP OP{ 0xF2400000 }OP movw
+    OP{ 0xF2C00000 }OP movt
+
+VARIANTS{
+    WIDE   1 ?regs ?Rd    ?spec_reg   ?Rd!sp!pc                                    ?INSTRUCTION,
+}VARIANTS
+
+    OP{ 0xF3EF8000 }OP mrs
+
+VARIANTS{
+    WIDE   1 ?regs ?Rd>Rn ?spec_reg   ?Rd!sp!pc                                    ?INSTRUCTION,
+}VARIANTS
+
+    OP{ 0xF3808800 }OP msr
+
+VARIANTS{
+    NARROW 2 ?regs ?RdLo ?RnLo                                                     ?INSTRUCTION,
+}VARIANTS
+
+    OP{ 0x4340 }OP muls
+
+VARIANTS{
+    WIDE   3 ?regs ?Rd ?Rn ?Rm        ?all!sp!pc                                  ?INSTRUCTION,
+}VARIANTS
+
+DUP OP{ 0xFB00F000 }OP mul
+DUP OP{ 0xFB90F0F0 }OP sdiv
+    OP{ 0xFBB0F0F0 }OP udiv
+
+VARIANTS{
+    NARROW 2 ?regs ?RdLo  ?RnLo ?noimm ?noshift                                         ?INSTRUCTION,
+    WIDE   1 ?regs ?Rd    ?const         ?Rd!sp!pc                                  %S! ?INSTRUCTION,
+    WIDE   2 ?regs ?Rd    ?Rn>Rm ?shift  ?all!sp!pc                                 %S! ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0x43C0 0xF06F0000 0xEA6F0000 }OP mvns
+
+VARIANTS{
+    WIDE   1 ?regs ?Rd    ?const         ?Rd!sp!pc                                      ?INSTRUCTION,
+    WIDE   2 ?regs ?Rd    ?Rn>Rm ?shift  ?all!sp!pc                                     ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0xF06F0000 0xEA6F0000 }OP mvn
+
+VARIANTS{
+    WIDE   2 ?regs ?Rd   ?Rn   ?const      ?all!sp!pc                              %S! ?INSTRUCTION,
+    WIDE   %WIDE_SHIFT                                                             %S! ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0xF0600000 0xEA600000 }OP orns
+
+VARIANTS{
+    WIDE     1 ?regs ?Rd>Rn                 ?i12_2   ?Rd!pc                            ?INSTRUCTION,
+    WIDE     1 ?regs ?Rd>Rn                 ?-i8     ?Rd!pc                            ?INSTRUCTION,
+    WIDE     0 ?regs                        ?+-label12                                 ?INSTRUCTION,
+    WIDE     2 ?regs ?Rd>Rn ?Rn>Rm ?lsl2    ?all!pc  ?Rn!sp                            ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP{ 0xF890F000 0xF810FC00 0xF81FF000 0xF810F000 }OP pld
+    OP{ 0xF990F000 0xF910FC00 0xF91FF000 0xF910F000 }OP pli
+
+VARIANTS{
+    NARROW 0 ?regs  ?noimm ?noshift ?reglist_lo&pc                                     ?INSTRUCTION,
+    WIDE   0 ?regs  ?noimm ?noshift ?reglist    ?2regs_inlist ?pclr!inlist ?sp!inlist ?pc_inlist&last_it ?INSTRUCTION,
+    WIDE   1 ?regs  ?Rd>Rt ?noimm ?noshift ?Rd!sp ?Rd!pc!lastIt                               ?INSTRUCTION,
+}VARIANTS ( xt )
+
+   OP{ 0xBC00 0xE8BD0000 0xF85D0B04 }OP pop
+
+VARIANTS{
+    NARROW 0 ?regs  ?noimm ?noshift ?reglist_lo&lr                                     ?INSTRUCTION,
+    WIDE   0 ?regs  ?noimm ?noshift ?reglist    ?2regs_inlist ?pc!inlist ?sp!inlist    ?INSTRUCTION,
+    WIDE   1 ?regs  ?Rd>Rt ?noimm ?noshift ?Rd!sp ?Rd!pc                               ?INSTRUCTION,
+}VARIANTS ( xt )
+
+   OP{ 0xB400 0xE92D0000 0xF84D0D04 }OP push
+
+VARIANTS{
+    NARROW 2 ?regs ?RdLo ?RnLo                                                         ?INSTRUCTION,
+    WIDE   2 ?regs ?Rd   ?RnRm                         ?all!sp!pc                      ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP{ 0xBA00 0xFA90F080 }OP rev
+DUP OP{ 0xBA40 0xFA90F090 }OP rev16
+    OP{ 0xBAC0 0xFA90F0B0 }OP revsh
+
+VARIANTS{
+    NARROW 2 ?regs ?RdLo ?RnLo ?noimm                                              ?INSTRUCTION,
+    WIDE   2 ?regs ?Rd   ?Rn>Rm ?i5shift         ?all!sp!pc                    %S! ?INSTRUCTION,
+    WIDE   3 ?regs ?Rd   ?Rn   ?Rm               ?all!sp!pc                    %S! ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP'{ ,ror 0x41C0 0xEA4F0030 0xFA60F000 }'OP rors
+
+VARIANTS{
+    WIDE   2 ?regs ?Rd   ?Rn>Rm                  ?all!sp!pc                    %S! ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0xEA4F0030 }OP rrxs
+
+VARIANTS{
+    WIDE   2 ?regs ?Rd   ?Rn>Rm                  ?all!sp!pc                        ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0xEA4F0030 }OP rrx
+
+VARIANTS{
+    WIDE   2 ?regs ?Rd   ?Rn    ?i5shift ?widthm1 ?all!sp!pc                       ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP{ 0xF3400000 }OP sbfx
+    OP{ 0xF3C00000 }OP ubfx
+
+VARIANTS{
+    WIDE   4 ?regs ?Rd>Rt ?Rn>Rd ?Rm>Rn ?Rt>Rm    ?all!sp!pc ?Rd!Rn                ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP{ 0xFBC00000 }OP smlal
+DUP OP{ 0xFB800000 }OP smull
+DUP OP{ 0xFBE00000 }OP umlal
+    OP{ 0xFBA00000 }OP umull
+
+VARIANTS{
+    WIDE   2 ?regs ?Rd ?Rn     ?sat_shift ?all!sp!pc                               ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP{ 0xF3000000 }OP ssat
+    OP{ 0xF3800000 }OP usat
+
+VARIANTS{
+    NARROW 1 ?regs ?RdLo8 ?noimm ?noshift ?reglist_lo                              ?INSTRUCTION,
+    WIDE   1 ?regs ?Rd>Rn ?noimm ?noshift ?reglist    ?Rd!pc ?2regs_inlist ?pc!inlist ?sp!inlist ?w_Rd_!inlist  %W! ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP{ 0xC000 0xE8800000 }OP stm
+    OP{ 0xC000 0xE8800000 }OP stmia
+
+VARIANTS{
+    WIDE   1 ?regs ?Rd>Rn ?noimm ?noshift ?reglist    ?Rd!pc ?2regs_inlist ?pc!inlist ?sp!inlist ?w_Rd_!inlist  %W! ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0xE9000000 }OP stmdb
+
+VARIANTS{
+    NARROW   2 ?regs ?RdLo ?RnLo  ?noshift ?i5*4       ?W2                                             ?INSTRUCTION, \ immediate T1
+    NARROW   2 ?regs ?RdLo8       ?noshift ?i8*4       ?Rn=sp ?W2                                      ?INSTRUCTION, \ immediate T2
+    WIDE     2 ?regs ?Rd>Rt   ?Rn ?noshift ?offset     ?P2&W2!0 ?W2!Rd!Rn ?all!pc                      ?INSTRUCTION, \ immediate T4
+    WIDE     2 ?regs ?Rd>Rt   ?Rn ?noshift ?i12_2      ?all!pc ?W2                                     ?INSTRUCTION, \ immediate T3
+    NARROW   3 ?regs ?RdLo ?RnLo  ?RmLo  ?noshift                                                      ?INSTRUCTION, \ register T1
+    WIDE     3 ?regs ?Rd>Rt ?Rn ?Rm ?lsl2              ?all!pc ?Rm!sp                                  ?INSTRUCTION, \ register T2
+}VARIANTS ( xt )
+
+    OP{ 0x6000 0x9000 0xF8400800 0xF8C00000 0x5000 0xF8400000 }OP str
+
+VARIANTS{
+    NARROW   2 ?regs ?RdLo ?RnLo  ?noshift ?i5         ?W2                                             ?INSTRUCTION, \ immediate T1
+    WIDE     2 ?regs ?Rd>Rt   ?Rn ?noshift ?offset     ?P2&W2!0 ?W2!Rd!Rn ?all!pc ?Rd!sp               ?INSTRUCTION, \ immediate T3
+    WIDE     2 ?regs ?Rd>Rt   ?Rn ?noshift ?i12_2      ?Rd!sp ?all!pc ?W2                              ?INSTRUCTION, \ immediate T2
+    NARROW   3 ?regs ?RdLo ?RnLo  ?RmLo  ?noshift                                                      ?INSTRUCTION, \ register T1
+    WIDE     3 ?regs ?Rd>Rt ?Rn ?Rm ?lsl2              ?Rd!sp ?Rm!sp ?all!pc                           ?INSTRUCTION, \ register T2
+}VARIANTS ( xt )
+
+DUP OP{ 0x7000 0xF8000800 0xF8800000 0x5400 0xF8000000 }OP strb
+    OP{ 0x8000 0xF8200800 0xF8A00000 0x5200 0xF8200000 }OP strh
+
+VARIANTS{
+    WIDE     3 ?regs ?Rd>Rt ?Rn>Rt2 ?Rm>Rn ?noshift ?aligned ?offset2   ?P2&W2!0 ?all!pc ?W2!Rd!Rn!Rm ?Rn!sp ?Rm!sp  ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0xE8400000 }OP strd
+
+VARIANTS{
+    WIDE     3 ?regs ?Rd ?Rn>Rt ?Rm>Rn   ?noshift ?i8*4    ?Rd!sp!pc ?Rn!sp!pc ?Rd!Rm ?Rd!Rn           ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0xE8400000 }OP strex
+
+VARIANTS{
+    WIDE     3 ?regs ?Rd>Rm ?Rn>Rt ?Rm>Rn  ?noshift        ?Rd!sp!pc ?Rn!sp!pc ?Rd!Rm ?Rd!Rn           ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP{ 0xE8C00F40 }OP strexb
+    OP{ 0xE8C00F50 }OP strexh
+
+VARIANTS{
+    NARROW 2 ?regs ?Rd=sp ?Rn=sp ?i7*4                                             ?INSTRUCTION,
+    WIDE   2 ?regs ?Rd   ?Rn   ?const          ?Rd!sp!pc ?Rn!pc                    ?INSTRUCTION,
+    WIDE   %WIDE_SHIFT                                                             ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0xB080 0xF1A00000 0xEBA00000 }OP sub
+
+VARIANTS{
+    NARROW 2 ?regs ?RdLo ?RnLo ?noimm                                              ?INSTRUCTION,
+    WIDE   2 ?regs ?Rd   ?Rn>Rm   ?rot*8       ?all!sp!pc                          ?INSTRUCTION,
+}VARIANTS ( xt )
+
+DUP OP{ 0xB240 0xFA4FF080 }OP sxtb
+DUP OP{ 0xB200 0xFA0FF080 }OP sxth
+DUP OP{ 0xB2C0 0xFA5FF080 }OP uxtb
+    OP{ 0xB280 0xFA1FF080 }OP uxth
+
+VARIANTS{
+    NARROW 2 ?regs ?RdLo ?RnLo ?noimm ?noshift                                        ?INSTRUCTION,
+    WIDE   1 ?regs ?Rd>Rn         ?const      ?Rd!sp!pc                               ?INSTRUCTION,
+    WIDE   2 ?regs ?Rd>Rn ?Rn>Rm  ?shift      ?all!sp!pc                              ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0x4200 0xF0100F00 0xEA100F00 }OP tst
+
+VARIANTS{
+    WIDE   1 ?regs ?Rd>Rn         ?const      ?Rd!sp!pc                               ?INSTRUCTION,
+    WIDE   2 ?regs ?Rd>Rn ?Rn>Rm  ?shift      ?all!sp!pc                              ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0xF0900F00 0xEA900F00 }OP teq
+
+VARIANTS{
+    WIDE   2 ?regs ?Rd>Rn ?Rn>Rm              ?Rn!pc  ?all!sp                         ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0xE8D0F000 }OP tbb
+
+VARIANTS{
+    WIDE   2 ?regs ?Rd>Rn ?Rn>Rm              ?Rn!pc  ?all!sp                         ?INSTRUCTION,
+}VARIANTS ( xt )
+
+    OP{ 0xE8D0F010 }OP tbh
+
+0 8 IT_OP: it
+1 C IT_OP: itt
+1 4 IT_OP: ite
+2 E IT_OP: ittt
+2 6 IT_OP: itet
+2 A IT_OP: itte
+2 2 IT_OP: itee
+3 F IT_OP: itttt
+3 7 IT_OP: itett
+3 B IT_OP: ittet
+3 3 IT_OP: iteet
+3 D IT_OP: ittte
+3 5 IT_OP: itete
+3 9 IT_OP: ittee
+3 1 IT_OP: iteee
+
+F3BF8F2F WIDE_OP: clrex
+F3AF8000 WIDE_OP: nop.w
+F3AF8001 WIDE_OP: yield.w
+F3AF8002 WIDE_OP: wfe.w
+F3AF8003 WIDE_OP: wfi.w
+F3AF8004 WIDE_OP: sev.w
+
+BF00 NARROW_OP: nop
+BF10 NARROW_OP: yield
+BF20 NARROW_OP: wfe
+BF30 NARROW_OP: wfi
+BF40 NARROW_OP: sev
+
+\ ==========================================================================================
+
+PREVIOUS DEFINITIONS
+: ASM{   ALSO ASSEMBLER [ ALSO ASSEMBLER ]] NEW [[ PREVIOUS ]  ;
+: }ASM   PREVIOUS ;
+
+: [ASM]   ASM{ ; IMMEDIATE
+: [END-ASM]   }ASM ; IMMEDIATE
+
+: ?CONST ( x - f ) \ can x be expressed by thumb2 constant?
+    [ ALSO ASSEMBLER ]]  #const  [[ PREVIOUS ]
+    DUP IF 2DROP 2DROP TRUE THEN
+;
+
+BASE !
+
+\EOF

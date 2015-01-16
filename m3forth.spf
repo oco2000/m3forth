@@ -1,0 +1,102 @@
+\ m3forth
+DECIMAL
+
+C" 0.5" CONSTANT _VERSION
+.( m3forth by Oleg Voronin, David Kuehling. Version )
+_VERSION COUNT TYPE CR
+
+S" lib/include/double.f" INCLUDED
+
+2VARIABLE FNAME \ program file name
+FNAME 2!
+2VARIABLE FDEVICE \ device file name
+FDEVICE 2!
+
+S" cross.spf" 			INCLUDED
+S" lib/include/place.f" INCLUDED
+S" hex.spf" INCLUDED
+CREATE FILENAME 255 ALLOT \ temp buffer
+
+\ ================= контроллер
+S" devices/devices.spf" INCLUDED \ device types
+FNAME 2@ FILENAME PLACE
+S" .elf" FILENAME +PLACE
+
+\ enable generation of word headers if you want to run a full forth-interpreter inside the target system!
+INTERPRETER
+O_HEADERS INVERT HEADLESS !
+FDEVICE 2@ INCLUDED \ include device file, start generating debug info
+
+HOST 'RAMBASE INTERPRETER EQU 'RAMBASE HOST
+
+\ compile asm primitives into cdata space
+S" prims.spf" INCLUDED
+\ now compile the higher-level code written as forth definitions
+S" kernel.spf" INCLUDED
+
+O_INTERPRETER [IF]
+    \ execute and build words on target
+    S" interpreter.spf" INCLUDED
+
+[THEN]
+
+HOST FNAME 2@ INCLUDED	\ include program file
+TARGET UDATA HERE HALIGNED DP !
+
+( * finalize firmware image and add bootup code.  do not touch. * )
+
+\ freeze the IDATA section by copying it into a 'self-extracting' image in
+\ CDATA space.  Running the forth-word of the image, restores the IDATA
+\ section at run-time
+IDATA IRAM  SECTION-IMAGE: IDATA-IMAGE
+\ after freezing the image, changes to idata variables do not take effect.
+\ this has the side-effect that any words added hereafter, won't be linked
+\ into the dictionary (but you can still run the code, if it resides in cdata
+\ space)
+\ INTERPRETER HEADLESS ON  \ headers are a waste of time
+
+\ forth code entry point.  note: return stack not yet set up
+TARGET CDATA HEX
+: (COLD)
+    IDATA-IMAGE      \ initialize IRAM
+    MAIN
+    BEGIN AGAIN
+;
+
+\ definition for reset interrupt: call into forth interpreter at (cold)
+CDATA TARGET LABEL RESET
+    STACK-BOTTOM fsp #mov  \ set data stack pointer
+    RSTACK-BOTTOM tmp #mov \ set return stack pointer
+    tmp sp mov
+    'RAMBASE  rambase #mov  \ set rambase pointer
+    0 # r9 movw
+    -1 # r10 movs
+
+    ' (COLD) BNARROW,
+END-LABEL
+
+\ rewrite reset IRQ entry to point to the above reset code
+RESET  1+  RESET_IRQ  !
+
+( * done.  now the cdata image can be dumped. * )
+
+TARGET HERE CURRENT-SECTION-START HOST - DWARF_END \ elf file created
+
+HOST
+FNAME 2@ FILENAME PLACE
+S" .bin" FILENAME +PLACE
+INTERPRETER CDATA FLASH HOST FILENAME COUNT
+INTERPRETER DUMP-SECTION \ create binary file
+
+O_HEX [IF]
+    FNAME 2@ FILENAME PLACE
+    S" .hex" FILENAME +PLACE
+    TARGET HERE SECTION-START HOST TUCK - FILENAME COUNT HEX-SAVE \ create hex file
+[THEN]
+
+INTERPRETER
+.SUMMARY
+.STACK
+
+BYE
+

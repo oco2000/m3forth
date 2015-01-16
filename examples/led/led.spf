@@ -1,0 +1,132 @@
+\ stm32vldiscovery leds and button test
+
+TARGET DECIMAL
+
+100 EQU START_MULTIPLIER \ 100 * 10 ms = 1s
+
+: DELAY ( n -- )   0 ?DO LOOP ;
+
+IDATA VARIABLE BUTTON_STATE
+0 BUTTON_STATE !
+
+HOST DEVICE stm32vldiscovery = TARGET [IF]
+
+: INIT
+    \ PORTC & PORTA APB2 clocking
+    RCC_APB2ENR_IOPCEN RCC_APB2ENR_IOPAEN OR  RCC_APB2ENR SET
+    \ port configure
+    GPIO_CRH_CNF8    GPIO_CRH_CNF9    OR  GPIOC_CRH CLEAR  \ bits 8,9 for output, push-pull
+    GPIO_CRH_MODE8_0 GPIO_CRH_MODE9_0 OR  GPIOC_CRH SET \ 10(50) MHz
+    GPIO_CRL_CNF0_0 GPIOA_CRL CLEAR \ PA0 digital input
+    GPIO_CRL_CNF0_1 GPIOA_CRL SET   \ PA0 digital input
+    0 BIT GPIOA_ODR CLEAR \ pull-down
+
+    STCALIB @  START_MULTIPLIER *  STRELOAD ! \ systick initial value counter
+    0 BIT 1 BIT OR  STCTRL SET \ enable systick timer and interrupt
+;
+
+: GET_BUTTON ( -- state )
+    GPIOA_IDR @   0 BIT AND     \ read button port
+;
+
+: LED_ON
+    \ bit set
+\        GPIO_BSRR_BS8 GPIOC_BSRR ! \ set/reset register
+\        8 BIT GPIOC_BSRR !         \ set/reset regiter
+\        8 GPIOC_ODR BSET           \ bit-banding
+    8 BIT GPIOC_ODR SET        \ read/mask/write
+;
+
+: LED_OFF
+    \ bit clear
+\        GPIO_BSRR_BR8 GPIOC_BSRR ! \ set/reset register
+\        8 BIT GPIOC_BRR !          \ reset regiter
+\        8 GPIOC_ODR BCLEAR         \ bit-banding
+    8 BIT GPIOC_ODR CLEAR      \ read/mask/write
+;
+
+: LED_TOGGLE
+    8 BIT GPIOC_ODR SWITCH
+;
+
+: LED_SHOW ( show? -- )
+    IF LED_ON ELSE LED_OFF THEN ;
+
+: CHECK_BUTTON
+    GET_BUTTON
+    BUTTON_STATE @ 0= OVER 0<> AND IF \ pressed
+        STRELOAD @ 2/ DUP 200 <= IF DROP STCALIB @  START_MULTIPLIER * THEN STRELOAD !
+        5000 DELAY \ wait for jitter
+    THEN
+    DUP BUTTON_STATE !
+    LED_SHOW
+;
+
+[ELSE]
+
+HOST -b TARGET \ don't use bit-banding for proteus
+
+5 BIT       EQU LED_MASK
+GPIOA_DATA  EQU LED_PORT
+GPIOA_DATA_Bits LED_MASK 2 LSHIFT +  EQU LED
+GPIOA_DIR   EQU LED_DIR
+
+2 BIT       EQU BUTTON
+GPIOA_DATA  EQU BUTTON_PORT
+GPIOA_DIR   EQU BUTTON_DIR
+GPIOA_PDR   EQU BUTTON_PULL
+
+: INIT
+    1 SYSCTL_RCGC2 SET \ clock PORTA
+    SYSCTL_RCGC2 @ DROP \ wait
+
+    LED_MASK LED_DIR SET \ LED for output
+
+    BUTTON BUTTON_DIR CLEAR \ Button for input
+    BUTTON BUTTON_PULL SET \ Pull-down
+
+\    100 STRELOAD ! \ systick initial value counter
+\    100 STCURR ! \ clear timer
+\    7 STCTRL ! \ enable systick timer and interrupt
+\    SYSTIMER does not work in Proteus
+;
+
+: LED_ON
+    LED_MASK LED SET
+;
+
+: LED_OFF
+    LED_MASK LED CLEAR
+;
+
+: GET_BUTTON
+    BUTTON_PORT @ BUTTON AND
+;
+
+: LED_TOGGLE
+    LED_MASK LED SWITCH
+;
+
+: LED_SHOW ( show? -- )
+    IF LED_ON ELSE LED_OFF THEN ;
+
+: CHECK_BUTTON
+    GET_BUTTON LED_SHOW
+;
+
+[THEN]
+
+
+HANDLER: SYSTICK
+    LED_TOGGLE
+;HANDLER
+
+' SYSTICK    SYSTICK_IRQ IRQ! \ set systick interrupt handler
+
+: MAIN
+    INIT
+    BEGIN
+        CHECK_BUTTON
+    AGAIN
+;
+

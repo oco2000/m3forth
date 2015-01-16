@@ -1,0 +1,86 @@
+TARGET   HEX
+
+\ Interrupts
+
+INTERRUPT WWDG_IRQ                \ Window WatchDog Interrupt
+INTERRUPT PVD_IRQ                 \ PVD through EXTI Line detection Interrupt
+INTERRUPT TAMPER_IRQ              \ Tamper Interrupt
+INTERRUPT RTC_IRQ                 \ RTC global Interrupt
+INTERRUPT FLASH_IRQ               \ FLASH global Interrupt
+INTERRUPT RCC_IRQ                 \ RCC global Interrupt
+INTERRUPT EXTI0_IRQ               \ EXTI Line0 Interrupt
+INTERRUPT EXTI1_IRQ               \ EXTI Line1 Interrupt
+INTERRUPT EXTI2_IRQ               \ EXTI Line2 Interrupt
+INTERRUPT EXTI3_IRQ               \ EXTI Line3 Interrupt
+INTERRUPT EXTI4_IRQ               \ EXTI Line4 Interrupt
+INTERRUPT DMA1_Channel1_IRQ       \ DMA1 Channel 1 global Interrupt
+INTERRUPT DMA1_Channel2_IRQ       \ DMA1 Channel 2 global Interrupt
+INTERRUPT DMA1_Channel3_IRQ       \ DMA1 Channel 3 global Interrupt
+INTERRUPT DMA1_Channel4_IRQ       \ DMA1 Channel 4 global Interrupt
+INTERRUPT DMA1_Channel5_IRQ       \ DMA1 Channel 5 global Interrupt
+INTERRUPT DMA1_Channel6_IRQ       \ DMA1 Channel 6 global Interrupt
+INTERRUPT DMA1_Channel7_IRQ       \ DMA1 Channel 7 global Interrupt
+INTERRUPT ADC1_2_IRQ              \ ADC1 and ADC2 global Interrupt
+INTERRUPT ADC1_IRQ                \ ADC1 global Interrupt
+INTERRUPT USB_HP_CAN1_TX_IRQ      \ USB Device High Priority or CAN1 TX Interrupts
+INTERRUPT USB_LP_CAN1_RX0_IRQ     \ USB Device Low Priority or CAN1 RX0 Interrupts
+INTERRUPT CAN1_RX1_IRQ            \ CAN1 RX1 Interrupt
+INTERRUPT CAN1_SCE_IRQ            \ CAN1 SCE Interrupt
+INTERRUPT EXTI9_5_IRQ             \ External Line[9:5] Interrupts
+INTERRUPT TIM1_BRK_IRQ            \ TIM1 Break Interrupt
+INTERRUPT TIM15_IRQ               \ TIM1 Break Interrupt and TIM15 Interrupt
+INTERRUPT TIM9_IRQ                \ TIM1 Break Interrupt and TIM9 global Interrupt
+INTERRUPT TIM1_UP_IRQ             \ TIM1 Update Interrupt
+INTERRUPT TIM10_IRQ               \ TIM1 Update Interrupt and TIM10 global Interrupt
+INTERRUPT TIM16_IRQ               \ TIM1 Update and TIM16 Interrupts
+INTERRUPT TIM1_TRG_COM_IRQ        \ TIM1 Trigger and Commutation Interrupt
+INTERRUPT TIM11_IRQ               \ TIM1 Trigger and Commutation Interrupt and TIM11 global interrupt
+INTERRUPT TIM17_IRQ               \ TIM1 Trigger and Commutation and TIM17 Interrupt
+INTERRUPT TIM1_CC_IRQ             \ TIM1 Capture Compare Interrupt
+INTERRUPT TIM2_IRQ                \ TIM2 global Interrupt
+INTERRUPT TIM3_IRQ                \ TIM3 global Interrupt
+INTERRUPT TIM4_IRQ                \ TIM4 global Interrupt
+INTERRUPT I2C1_EV_IRQ             \ I2C1 Event Interrupt
+INTERRUPT I2C1_ER_IRQ             \ I2C1 Error Interrupt
+INTERRUPT I2C2_EV_IRQ             \ I2C2 Event Interrupt
+INTERRUPT I2C2_ER_IRQ             \ I2C2 Error Interrupt
+INTERRUPT SPI1_IRQ                \ SPI1 global Interrupt
+INTERRUPT SPI2_IRQ                \ SPI2 global Interrupt
+INTERRUPT USART1_IRQ              \ USART1 global Interrupt
+INTERRUPT USART2_IRQ              \ USART2 global Interrupt
+INTERRUPT USART3_IRQ              \ USART3 global Interrupt
+INTERRUPT EXTI15_10_IRQ           \ External Line[15:10] Interrupts
+INTERRUPT RTCAlarm_IRQ            \ RTC Alarm through EXTI Line Interrupt
+INTERRUPT CEC_IRQ                 \ HDMI-CEC Interrupt
+INTERRUPT OTG_FS_WKUP_IRQ         \ USB OTG FS WakeUp from suspend through EXTI Line Interrupt
+INTERRUPT USBWakeUp_IRQ           \ USB Device WakeUp from suspend through EXTI Line Interrupt
+INTERRUPT TIM8_BRK_IRQ            \ TIM8 Break Interrupt
+INTERRUPT TIM12_IRQ               \ TIM8 Break Interrupt and TIM12 global Interrupt
+INTERRUPT TIM8_UP_IRQ             \ TIM8 Update Interrupt
+INTERRUPT TIM13_IRQ               \ TIM8 Update Interrupt and TIM13 global Interrupt
+INTERRUPT TIM8_TRG_COM_IRQ        \ TIM8 Trigger and Commutation Interrupt
+INTERRUPT TIM14_IRQ               \ TIM8 Trigger and Commutation Interrupt and TIM14 global interrupt
+INTERRUPT TIM8_CC_IRQ             \ TIM8 Capture Compare Interrupt
+INTERRUPT ADC3_IRQ                \ ADC3 global Interrupt
+INTERRUPT FSMC_IRQ                \ FSMC global Interrupt
+INTERRUPT SDIO_IRQ                \ SDIO global Interrupt
+INTERRUPT TIM5_IRQ                \ TIM5 global Interrupt
+INTERRUPT SPI3_IRQ                \ SPI3 global Interrupt
+INTERRUPT UART4_IRQ               \ UART4 global Interrupt
+INTERRUPT UART5_IRQ               \ UART5 global Interrupt
+INTERRUPT TIM6_DAC_IRQ            \ TIM6 and DAC underrun Interrupt
+INTERRUPT TIM6_IRQ                \ TIM6 global Interrupt
+INTERRUPT TIM7_IRQ                \ TIM7 global Interrupt
+INTERRUPT DMA2_Channel1_IRQ       \ DMA2 Channel 1 global Interrupt
+INTERRUPT DMA2_Channel2_IRQ       \ DMA2 Channel 2 global Interrupt
+INTERRUPT DMA2_Channel3_IRQ       \ DMA2 Channel 3 global Interrupt
+INTERRUPT DMA2_Channel4_5_IRQ     \ DMA2 Channel 4 and Channel 5 global Interrupt
+INTERRUPT DMA2_Channel4_IRQ       \ DMA2 Channel 4 global Interrupt
+INTERRUPT DMA2_Channel5_IRQ       \ DMA2 Channel 5 global Interrupt
+INTERRUPT ETH_IRQ                 \ Ethernet global Interrupt
+INTERRUPT ETH_WKUP_IRQ            \ Ethernet Wakeup through EXTI line Interrupt
+INTERRUPT CAN2_TX_IRQ             \ CAN2 TX Interrupt
+INTERRUPT CAN2_RX0_IRQ            \ CAN2 RX0 Interrupt
+INTERRUPT CAN2_RX1_IRQ            \ CAN2 RX1 Interrupt
+INTERRUPT CAN2_SCE_IRQ            \ CAN2 SCE Interrupt
+INTERRUPT OTG_FS_IRQ              \ USB OTG FS global Interrupt

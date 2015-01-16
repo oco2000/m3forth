@@ -1,0 +1,1097 @@
+\
+\ Cross compiler core
+\
+
+S" lib/include/core-ext.f" INCLUDED
+S" lib/include/case.f" INCLUDED
+S" lib/include/defer.f" INCLUDED
+S" lib/include/tools.f" INCLUDED
+S" lib/include/string.f" INCLUDED
+S" lib/include/enum.f" INCLUDED
+:NONAME DUP CONSTANT 1 + ; ENUM enum    \ C-compatible enums
+
+\ spf4 - specific
+\ halt on error
+: ?HALT
+ ?DUP IF DUP ERROR2 HALT THEN ;
+
+' ?HALT TO ERROR
+
+\ utilities
+: U.H   BASE @ HEX SWAP U. BASE ! ;
+
+: .STACK
+    DEPTH ?DUP IF
+        ." Stack: " .SN CR
+    THEN
+;
+
+: TYPE.R ( a n field -- )
+    OVER - 0 MAX SPACES TYPE
+;
+
+: ?RESTORE-INPUT RESTORE-INPUT ABORT" restore-input failed" ;
+
+: .NAME ( addr "name" -- "name" )
+    SAVE-INPUT BL WORD COUNT TYPE ?RESTORE-INPUT
+    ." : " U.H CR
+;
+: M?NAME ( x -- x )
+    O_MAP IF DUP .NAME THEN
+;
+: D?NAME ( x -- x )
+    O_DEBUG IF DUP .NAME THEN
+;
+
+: BIT  ( n -- mask )
+    1 SWAP LSHIFT ;
+: LO    ( x - n )
+    0xFFFF AND ;
+: HI    ( x - n )
+    0x10 RSHIFT ;
+: SPLIT ( x -- lo hi )
+    DUP LO SWAP HI
+;
+: NEXT-WORD ( -- c-addr )
+    BEGIN BL WORD DUP C@ 0= WHILE
+    DROP REFILL 0= ABORT" Unexpected end of input"
+    REPEAT ;
+
+\ make asciiz string
+: >ASCIIZ ( addr u -- z ) CHARS OVER + 0 SWAP C! ;
+
+: 2, , , ;
+
+\ host helper routines
+: ARRAY ( n -- ) CREATE CELLS ALLOT DOES> SWAP CELLS + ;
+: -ROLL ( x_0 .. x_n n -- x_n x_0 .. x_n-1 )
+    DUP 0 ?DO DUP >R ROLL R> LOOP DROP ;
+: BOUNDS ( c-addr u1 -- c-addr2 c-addr3 ) OVER + SWAP ;
+
+: PARSE-NUMBER ( c-addr u -- d +1 | d -1 | d 0 )
+    \ 0 - error
+    \ -1 - CELL
+    \ 1 - 2 CELLS
+    DUP 0= IF 2DROP 0. 0 EXIT THEN
+    OVER C@ [CHAR] - = DUP >R 1 AND /STRING \ process '-'
+    0 0 2SWAP >NUMBER ( ud a u )
+    DUP 1 = IF
+    DROP C@ [CHAR] . = 1 AND ( d 1 {if double} | d 0 )
+    ELSE NIP 0= THEN ( d -1 if single )
+    R> IF >R DNEGATE R> THEN ;
+
+\ scopes
+VOCABULARY TARGETING
+VOCABULARY INTERPRETING
+VOCABULARY COMPILING
+VOCABULARY POSTPONING
+
+0 VALUE SCOPE
+
+\ can this be rewritten in a nicer way? replace conditional scope updating
+\ with custom definition for 'host'?
+: SCOPE: ( xt needs-update? "name" -- )
+    CREATE SWAP , , DOES> DUP TO SCOPE @ EXECUTE ;
+: ?UPDATE-SCOPE ( -- ) \ update scope order if needs update at state-switch
+    \ we won't update in host scope, as host scope needs to be able to handle
+    \ wordlists itself
+    SCOPE CELL+ @ IF SCOPE @ EXECUTE THEN ;
+:NONAME ( -- ) \ set host scope order
+    ONLY FORTH DEFINITIONS ;        FALSE SCOPE: HOST
+:NONAME ( -- ) \ target scope order
+    \ note: wordlists during compilation handled by 'target-compiler'
+    ONLY TARGETING DEFINITIONS
+    ALSO INTERPRETING ; TRUE SCOPE: TARGET
+:NONAME ( -- ) \ set (update) interpreter scope order
+    STATE @ IF
+    ONLY FORTH ALSO INTERPRETING DEFINITIONS
+    ELSE
+    ONLY INTERPRETING DEFINITIONS ALSO FORTH
+    THEN ;              TRUE SCOPE: INTERPRETER
+:NONAME ( -- ) \ set (update) compiler scope order
+    STATE @ IF  ONLY FORTH ALSO INTERPRETING ALSO POSTPONING
+    ELSE    ONLY FORTH THEN
+    ALSO COMPILING DEFINITIONS
+    PREVIOUS ;              TRUE SCOPE: COMPILER
+
+: IMAKE ( xt -- ) \ execute in INTERPRETING DEFINITIONS
+    GET-CURRENT >R
+        ALSO INTERPRETING DEFINITIONS PREVIOUS
+        EXECUTE
+    R> SET-CURRENT
+;
+
+: ICREATE ( "name" -- ) \ create word in INTERPRETING wordlist
+    ['] CREATE IMAKE ;
+: CCREATE ( "name" -- ) \ create word in COMPILING wordlist
+    GET-CURRENT ALSO COMPILING DEFINITIONS PREVIOUS
+    CREATE SET-CURRENT ;
+
+\ overload state-changing words to update scope order
+HOST
+: : :           ?UPDATE-SCOPE ;
+: ; POSTPONE ;  ?UPDATE-SCOPE ; IMMEDIATE
+: ]] ]          ;
+: [[ POSTPONE [ ; IMMEDIATE
+: ] ]           ?UPDATE-SCOPE ;
+: [ POSTPONE [  ?UPDATE-SCOPE ; IMMEDIATE
+
+\ Target Addresses
+HOST
+: TCELLS    4 * ;
+: TCELL+    1 TCELLS + ;
+: TCHARS    ;
+: TCHAR+    1 TCHARS + ;
+: TALIGNED  3 + 3 INVERT AND ;
+: THALIGNED 1 + 1 INVERT AND ;
+
+\ target memory access (32bit little endian)
+: @32LE ( addr -- x )
+    0 4 0 ?DO 8 RSHIFT  OVER I CHARS + C@ 24 LSHIFT OR LOOP NIP ;
+: !32LE ( x addr -- )
+    4 0 ?DO OVER 255 AND OVER I CHARS + C! SWAP 8 RSHIFT SWAP LOOP  2DROP ;
+: @16LE ( addr -- x )
+    DUP C@  SWAP CHAR+ C@ 8 LSHIFT OR ;
+: !16LE ( x addr -- )
+    2DUP C! SWAP 8 RSHIFT SWAP CHAR+ C! ;
+: NOOP ;
+DEFER MODIFIED-THERE    \ hook for kernel to update its idata 'dp' and 'latest'
+' NOOP TO MODIFIED-THERE
+
+\ target sections
+0 CONSTANT #CDATA
+1 CONSTANT #UDATA
+2 CONSTANT #IDATA
+3 CONSTANT #TASKDATA    \ non-standard, internally used for USER variables
+: GET-SECTION-TYPE ( n -- a u )
+    S" CDATA   UDATA   IDATA   TASKDATA" DROP
+    SWAP 8 * + 8 -TRAILING
+;
+
+VARIABLE SECTION-TYPE   \ current section type
+: SECTION-TYPE!: CREATE , DOES> @ SECTION-TYPE ! ;
+
+INTERPRETER
+#CDATA SECTION-TYPE!: CDATA
+#UDATA SECTION-TYPE!: UDATA
+#IDATA SECTION-TYPE!: IDATA
+#TASKDATA SECTION-TYPE!: TASKDATA
+CDATA
+
+HOST
+\ handle list of sections
+VARIABLE LAST-SECTION 0 LAST-SECTION ! \ list head
+4 ARRAY CURRENT-SECTIONS    \ array of each type sections
+0 CURRENT-SECTIONS 4 CELLS ERASE
+
+: CURRENT-SECTION ( -- addr )   SECTION-TYPE @ CURRENT-SECTIONS ;
+
+0
+    CELL -- section-type    \ section-type
+    CELL -- section-link    \ link to previous section
+    CELL -- section-start   \ start address
+    CELL -- section-end     \ end address
+    CELL -- section-dp      \ DP
+    CELL -- section-memory  \ x cells -- memory
+DROP
+
+: SECTION ( taddr1 taddr2 "name" -- )
+    ICREATE HERE >R
+    SECTION-TYPE @ , LAST-SECTION @ , \ store type and link
+    2DUP 2,     \ store start and end address
+    OVER ,          \ store dp = start-addr
+    SWAP - HERE OVER CHARS ALLOT \ allocate memory for section
+    SWAP ERASE          \ and initialize to 0
+    R> LAST-SECTION !       \ make head of section list
+ DOES> \ make this section current of its type
+    DUP @ CURRENT-SECTIONS ! ;
+: SECTION-TRANGE ( section -- taddr1 taddr2 ) \ get section start and end address
+    section-start 2@ ;
+: SECTION-START ( section -- taddr1 ) \ get section start
+    section-end @ ;
+: SECTION-END ( section -- taddr2 ) \ get section end address
+    section-start @ ;
+: SECTION-THERE ( section -- there ) \ get section there pointer
+    section-dp @ ;
+: SECTION-HADDR ( section -- addr ) \ get section memory
+    section-memory ;
+: FIND-SECTION ( taddr -- section ) \ get section by memory address (cannot overlap addresses?)
+    LAST-SECTION @ >R
+    BEGIN R@ WHILE
+    DUP R@ SECTION-TRANGE WITHIN IF
+        DROP R> EXIT
+    THEN
+    R> section-link @ >R \ continue loop with next section
+    REPEAT R> DROP . ABORT" target address not within any target section" ;
+: TADDR>ADDR ( taddr -- addr ) \ get real memory address
+    DUP FIND-SECTION
+    DUP @ #TASKDATA = ABORT" invalid target address"
+    DUP SECTION-TRANGE DROP >R
+    SECTION-HADDR SWAP R> - CHARS + ;
+: SAVE-SECTIONS ( -- n*x 4 ) \ save current sections on stack
+    3 0 DO I CURRENT-SECTIONS @ LOOP SECTION-TYPE @ 4 ;
+: RESTORE-SECTIONS ( n*x 4 -- )
+    4 <> ABORT" restore-sections: invalid data"
+    SECTION-TYPE ! 0 2 DO I CURRENT-SECTIONS ! -1 +LOOP ;
+
+\ internal 64k pseudo-section used for allocating USER variables
+\ ~ INTERPRETER
+\ ~ HEX 0000 10000 TASKDATA SECTION (TASKDATA)
+\ ~ (TASKDATA)
+\ ~ HOST DECIMAL
+
+\ section type overrides
+\ ???
+: SECTION-OVERRIDE: ( default-type -- )
+    CREATE SECTION-TYPE @ ,
+    DOES> SECTION-TYPE @ SWAP ! ;
+
+INTERPRETER
+UDATA SECTION-OVERRIDE: VARIABLES
+IDATA SECTION-OVERRIDE: DEFERERS
+CDATA SECTION-OVERRIDE: COLON-DEFINITIONS
+CDATA SECTION-OVERRIDE: HEADERS
+HOST
+
+: (<SECTION-OVERRIDE) ( addr -- k*x ) \ save sections and set section type
+    @ >R SAVE-SECTIONS R> SECTION-TYPE ! ;
+: <SECTION-OVERRIDE ( "section" -- k*x ) \ save sections
+    ALSO INTERPRETING ' PREVIOUS
+    >BODY POSTPONE LITERAL POSTPONE (<SECTION-OVERRIDE) ; IMMEDIATE
+: SECTION-OVERRIDE> ( k*x -- ) \ restore
+    RESTORE-SECTIONS ;
+
+\ access to section's dictionary pointer
+: TDP ( -- addr )
+    CURRENT-SECTION @ section-dp ;
+: THERE ( -- addr ) TDP @ ;
+: CDATA-THERE ( -- addr ) \ get there in current CDATA setion
+    SAVE-SECTIONS [ INTERPRETER ] CDATA THERE [ HOST ]
+    >R RESTORE-SECTIONS R> ;
+
+: ?THERE ( -- ) \ check section overflow
+    THERE CURRENT-SECTION @
+    SECTION-TRANGE WITHIN 0= IF THERE . TRUE ABORT" Section out of space" THEN
+    MODIFIED-THERE ;
+
+\ options to be controlled by user
+HOST
+VARIABLE HEADLESS   \ flag: add dictionary headers to target code?
+
+\ setters for flag-variables a la 'headless'
+: ON TRUE SWAP ! ;
+: OFF FALSE SWAP ! ;
+
+\ target dictionary operations
+HOST
+: TALLOT ( x -- ) TDP +!    ?THERE ;
+: T@ ( taddr -- x ) TADDR>ADDR @32LE ;
+: T! ( x taddr -- ) TADDR>ADDR !32LE ;
+: TH@ ( taddr -- x ) TADDR>ADDR @16LE ;
+: TH! ( x taddr -- ) TADDR>ADDR !16LE ;
+: TC@ ( taddr -- x ) TADDR>ADDR C@ ;
+: TC! ( x taddr -- ) TADDR>ADDR C! ;
+: T, ( x -- ) THERE T! 1 TCELLS TALLOT ;
+: TH, ( x -- ) THERE TH! 2 TCHARS TALLOT ;
+: TC, ( x -- ) THERE TC! 1 TCHARS TALLOT ;
+: TALIGN ( x -- ) THERE TALIGNED TDP ! ?THERE ;
+: THALIGN ( x -- ) THERE THALIGNED TDP ! ?THERE ;
+: TALIGNED? ( a -- f )  3 AND 0= ;
+
+: TFIND ( c-addr -- t-xt -1 | xt +1 | c-addr 0 )
+    \ 1  - found in COMPILING
+    \ -1 - fount in TARGETING, gives THERE addr
+    \ 0 -not found
+    >R GET-ORDER R>
+    ONLY COMPILING FIND IF  1
+    ELSE    ONLY TARGETING FIND IF  >BODY @ -1 ELSE 0 THEN
+    THEN
+    2>R SET-ORDER 2R> ;
+: T' ( "name" -- t-xt )
+    \ find in TARGETING
+    \ todo: implement via tfind, see [compile]
+    GET-ORDER   ONLY TARGETING BL WORD FIND 2>R SET-ORDER
+    2R> 0= ABORT" not a target definition"
+    >BODY @ ;
+: [T'] ( "name" -- )
+    T' POSTPONE LITERAL ; IMMEDIATE
+
+ALSO POSTPONING DEFINITIONS PREVIOUS
+: [COMPILE] ( "name" -- ) \ for words in COMPILING only
+    BL WORD TFIND DUP 0= ABORT" unknown (target) word"
+    0< ABORT" not a compiler (immediate) word"
+    POSTPONE LITERAL POSTPONE EXECUTE ; IMMEDIATE
+
+\ alias target-memory ops into interpreter scope. also alias compilation
+\ helper words, required in target scope
+INTERPRETER
+: CELLS TCELLS ;
+: CELL  1 TCELLS ;
+: CELL+ TCELL+ ;
+: CHARS TCHARS ;
+: CHAR+ TCHAR+ ;
+: 1+ 1+ ;
+: + + ;
+: - - ;
+: LSHIFT LSHIFT ;
+: RSHIFT RSHIFT ;
+: BIT BIT ;
+: DROP DROP ;
+: ALIGNED TALIGNED ;
+: HALIGNED THALIGNED ;
+: ,H , ;
+: @H @ ;
+: , T, ;
+: H, TH, ;
+: C, TC, ;
+: ALIGN TALIGN ;
+: HALIGN THALIGN ;
+: HERE THERE ;
+: ALLOT TALLOT ;
+: ORG TDP ! ?THERE ;
+: @ T@ ;
+: ! T! ;
+: H@ TH@ ;
+: H! TH! ;
+: C@ TC@ ;
+: C! TC! ;
+: ' T' ;
+: FIND  TFIND ;
+: \ ['] \ EXECUTE ; IMMEDIATE
+: ( ['] ( EXECUTE ; IMMEDIATE       \ )
+: .( ['] .( EXECUTE ; IMMEDIATE
+: [IF] ['] [IF] EXECUTE ; IMMEDIATE
+: [ELSE] ['] [ELSE] EXECUTE ; IMMEDIATE
+: HOST HOST ;
+: TARGET TARGET ;
+: INTERPRETER INTERPRETER ;
+: COMPILER COMPILER ;
+: HEX HEX ;
+: DECIMAL DECIMAL ;
+: .STACK .STACK ;
+: ORDER ORDER ; IMMEDIATE
+: \EOF \EOF ;
+: CHAR CHAR ;
+: WORDS WORDS ;
+: ALSO ALSO ;
+: FORTH FORTH ;
+
+HOST
+\ debugging info
+S" lib/dwarf/dwarf.spf" INCLUDED
+
+\ creation of target words
+HOST
+
+0 VALUE LATEST-ZOMBIE
+
+\ 'link' and 'latest' are the same. Just if a word has a remote header,
+\ 'link' will point to the pointer in the header whereas 'latest' points to
+\ the actual code-field
+VARIABLE LINK 0 LINK !
+VARIABLE LATEST 0 LATEST !
+
+HEADLESS ON
+
+\ note: ghosts are used to mirror the target dictionary, used for compiling
+\ target code. zombies are used to emulate execution of target words, where
+\ execution semantics is known (such as CONSTANTs, VARIABLEs etc.)
+\ todo: can we merge ghosts with zombies? should be possible.
+
+: LF-ALIGN ( -- )   \ pad so after link-field we are half-cell-aligned
+    BEGIN
+    THERE 1 AND 0 <> WHILE 0 TC,
+    REPEAT ;
+
+: TNAME, ( c-addr u -- )    \ compile name
+    DUP 1 32 WITHIN 0= ABORT" Invalid name length"
+    DUP 128 OR      \ parameter&length field
+    >R 2>R <SECTION-OVERRIDE HEADERS
+        2R> R> TC,                      \ write parameter&length field
+        BOUNDS DO I C@ TC, LOOP     \ write name
+    SECTION-OVERRIDE> ;
+: TLINK, ( -- )         \ compile link field
+    <SECTION-OVERRIDE HEADERS
+        LF-ALIGN    LINK @ T,   THERE LINK ! MODIFIED-THERE
+    SECTION-OVERRIDE> ;
+: THEADER, ( c-addr u -- ) \ compile header
+    TNAME, TLINK, ;
+: ?THEADER ( "name" -- )    \ compile header if headless mode is off
+    BL WORD COUNT HEADLESS @ IF 2DROP ELSE THEADER, THEN ;
+: ?LATEST-ZOMBIE ( -- )
+    LATEST-ZOMBIE 0= ABORT" latest word not build using target's CREATE" ;
+: ZOMBIE-DOES> ( "name" -- )    \ compile zombie action
+    POSTPONE ?LATEST-ZOMBIE   POSTPONE DOES>   POSTPONE @   ; IMMEDIATE
+: KILL-ZOMBIE   ( -- ) \ make zombie to produce error on execute
+    ZOMBIE-DOES>
+    TRUE ABORT" definition's target behaviour not executable on host" ;
+: ?KILL-ZOMBIE \ make zombie to produce error on execute
+    LATEST-ZOMBIE IF KILL-ZOMBIE THEN ;
+: CREATE-ZOMBIE ( "name" -- ) \ create word in INTERPRETING, action - give its THERE
+    ICREATE HERE TO LATEST-ZOMBIE   THERE , ZOMBIE-DOES> ;
+: UNRESERVE ( -- ) \ remove reserved bytes
+    -6 TALLOT ;
+: CREATE-GHOST-NONAME ( -- xt )
+    THALIGN THERE LATEST ! \ create code-field, pointed to by latest
+    0 TH, 0 T, \ leave space for {push lr} and branch
+    0 TO LATEST-ZOMBIE
+    LATEST @ ;
+: CREATE-GHOST ( "name" -- ) \ create header in target, create same word in TARGETING
+    SAVE-INPUT  ?THEADER ?RESTORE-INPUT
+    THALIGN DWARF_CREATE_SUB CREATE-GHOST-NONAME DROP
+    GET-CURRENT ALSO TARGETING DEFINITIONS PREVIOUS
+    CREATE LATEST @ , SET-CURRENT
+    DOES> TRUE ABORT" Attempt to execute target 'ghost' definition!" ;
+: (TCREATE) ( "name" -- ) \ create word in target memory, TARGETING, INTERPRETING
+    SAVE-INPUT CREATE-GHOST ?RESTORE-INPUT
+    CREATE-ZOMBIE ;
+
+\ fallbacks to use from within interpreter scope
+HOST
+
+: CDATA-ORG ( addr -- )
+    >R SAVE-SECTIONS
+        [ INTERPRETER ] CDATA R> ORG [ HOST ]
+    RESTORE-SECTIONS
+;
+
+: ID. ( xt -- a u )
+    WordByAddr ( SPF-specific )
+;
+
+: .WORD ( cfa -- ) \ print word name by CFA
+    ." ====> " CDATA-THERE U.H ID. TYPE CR
+;
+
+: .SELF ( -- ) \ print self name
+    O_DEBUG IF
+        HERE POSTPONE LITERAL POSTPONE .WORD
+    THEN
+; IMMEDIATE
+
+-1 VALUE 'RAMBASE \ RAM base address, see device files
+
+: @H    @ ;
+: C@H   C@ ;
+: !H    ! ;
+: 'H    ' ;
+: >BODY'H    >BODY ;
+: [']H  POSTPONE ['] ; IMMEDIATE
+: HCONSTANT CONSTANT ; \ host constant
+: HVALUE ( n -- ) \ value zombie
+    CREATE ,
+    DOES> @ T@ \ get value
+;
+: HDEFER ( n -- ) \ value zombie
+    CREATE ,
+    DOES>  TRUE ABORT" definition's target behaviour not executable on host"
+;
+
+\ friendly operations on task storage (USER variables)
+\ ~ INTERPRETER
+\ ~ : UHERE     SAVE-SECTIONS TASKDATA HERE >R RESTORE-SECTIONS R> ;
+\ ~ : UALLOT    >R SAVE-SECTIONS TASKDATA R> ALLOT RESTORE-SECTIONS ;
+\ ~ : UALIGN    SAVE-SECTIONS TASKDATA ALIGN RESTORE-SECTIONS ;
+\ ~ : UHALIGN   SAVE-SECTIONS TASKDATA HALIGN RESTORE-SECTIONS ;
+
+\ forward references to threaded code handlers. initialized by prims.fs
+HOST
+0 VALUE DOCON
+0 VALUE DOUSER
+0 VALUE DODEFER
+0 VALUE 'NOOP
+
+\ forward references to primitives needed by compiler. set by prims.fs
+12 VALUE '(DO)
+13 VALUE '(?DO)
+14 VALUE '(LOOP)
+14 VALUE '(+LOOP)
+15 VALUE '(.")
+16 VALUE '(S")
+17 VALUE '(ABORT")
+
+\ load assembler
+HOST
+: 1s        ( x -- n )  \ count bits in word
+ DUP 0x55555555 AND   SWAP 2/        0x55555555 AND     +
+ DUP 0x33333333 AND   SWAP 2/ 2/     0x33333333 AND     +
+ DUP 0x0F0F0F0F AND   SWAP 4 RSHIFT  0x0F0F0F0F AND     +
+ DUP 0x00FF00FF AND   SWAP 8 RSHIFT  0x00FF00FF AND     +
+ DUP 0x0000FFFF AND   SWAP 16 RSHIFT 0x0000FFFF AND     +
+;
+
+: LSB       ( mask -- n )      \ get lsb number
+  0 ( mask n )
+  BEGIN
+    OVER 1 AND 0=
+  WHILE
+    1+ SWAP 2/ SWAP
+  REPEAT
+  NIP
+;
+
+: HSWAP ( n1 -- n2 ) \ swap halfwords
+    DUP 0xFFFF AND 16 LSHIFT SWAP 0xFFFF0000 AND 16 RSHIFT OR
+;
+
+: INSTR! SWAP HSWAP SWAP T! ; \ store instruction
+: INSTR@ T@ HSWAP ; \ fetch instruction
+: TINSTRN, THERE TH!    2 TALLOT ; \ compile narrow instruction
+: TINSTRW, THERE INSTR! 4 TALLOT ; \ compile wide instruction
+: TW@ TH@ ;
+: TW! TH! ;
+
+HOST
+S" lib/asm/asm.spf" INCLUDED
+
+INTERPRETER
+: ASM{ ASM{ ;
+: }ASM }ASM ;
+
+: COMPILE, ( xt -- ) \ compile call to word
+    [ASM] # bl [END-ASM]
+;
+
+HOST
+VECT LITERAL,
+
+S" macros.spf" INCLUDED
+S" optimizer.spf" INCLUDED
+
+\ basic subroutine threaded code
+HOST HEX
+
+: BRANCH! ( jump-to instruction-address -- )
+    THERE >R \ store current address
+    [ INTERPRETER ] ORG \ set new address
+    [ASM] BWIDE, [END-ASM] \ compile jump
+    R> ORG \ restore old address
+    [ HOST ]
+;
+
+: CALL! ( jump-to  instruction-address -- ) \ compile a call
+    2>R SAVE-SECTIONS
+        [ INTERPRETER ] CDATA  2R>
+        THERE >R ORG
+            [ASM]  { lr } push [END-ASM]
+            COMPILE,
+        R> ORG
+        [ HOST ]
+    RESTORE-SECTIONS
+;
+
+INTERPRETER HEX
+
+: CF! ( t-addr -- ) \ compile branch in code field to t-addr
+    LATEST @H  CALL!
+;
+: CFA>LFA ( a-addr -- h-addr ) CELL- ;
+: CFA>NFA ( a-addr -- c-addr ) CFA>LFA BEGIN 1- DUP C@ 80 AND UNTIL ;
+: >BODY ( xt -- a-addr ) CELL+ 2+ @ ; \ for words made by CREATE
+: TOGGLE ( c-addr x -- ) OVER C@ XOR SWAP C! ;
+
+\ literals
+
+: (LITERAL,) ( x -- )
+    DUP LIT>OPT
+    [ASM]
+        pusht
+        tos #mov
+    [END-ASM]
+;
+
+' (LITERAL,) TO LITERAL,
+: DLITERAL, ( x -- )
+    SWAP LITERAL, LITERAL, ;
+
+\ branching
+INTERPRETER
+
+: ?PAIRS ( n1 n1 -- ) <> ABORT" Control structure mismatch" ;
+: SLITERAL, ( a u -- ) \ compile string literal
+    DUP C,
+    OVER + SWAP ?DO I C@H C, LOOP
+    HALIGN ;
+: (SLITERAL) ( t-xt 'xxx"' -- ) \ compile string literal prepended by a call to a word
+    COMPILE, [CHAR] " PARSE SLITERAL, ;
+
+HOST
+\ compiling (aka "immediate" words) for target
+50005000 CONSTANT #DO
+50005001 CONSTANT #?DO
+50005002 CONSTANT #LEAVE-DELIMETER
+2VARIABLE LAST-FRAME
+
+COMPILER
+: \ ['] \ EXECUTE ;
+: ( ['] ( EXECUTE ; \ )
+: IF
+    [ASM]
+        tos tos tst
+        popt
+        ne if
+    [END-ASM] ;
+: THEN [ASM] then [END-ASM] NEW ;
+: ELSE [ASM] else [END-ASM] ;
+: BEGIN [ASM] begin [END-ASM] NEW ;
+: UNTIL
+    2DUP LAST-FRAME 2!
+    [ASM]
+        tos tos tst
+        popt
+        ne until
+    [END-ASM] ;
+: AGAIN
+    [ASM]
+        again
+    [END-ASM] ;
+
+: WHILE
+    [ASM]
+        tos tos tst
+        popt
+        ne while
+    [END-ASM] ;
+
+: REPEAT
+    [ASM]
+        repeat
+    [END-ASM] ;
+
+: RECURSE LATEST @H COMPILE, ;
+
+: DO '(DO) COMPILE,   [ASM] #LEAVE-DELIMETER begin #DO [END-ASM] ;
+: ?DO '(?DO) COMPILE, [ASM] #LEAVE-DELIMETER ne if begin #?DO [END-ASM] ;
+
+HOST
+: ?DO-LOOP ( flag -- )
+    DUP #DO = SWAP #?DO = OR INVERT ABORT" LOOP without DO!"
+;
+: ALL>R ( delimeter n1 n2 ... nx -- delimeter ) \ move numbers to return stack
+         ( R: -- nx .. n1 delimeter )
+  R>
+  #LEAVE-DELIMETER >R
+  BEGIN
+    SWAP DUP #LEAVE-DELIMETER <>
+  WHILE
+    >R
+  REPEAT
+  SWAP >R
+;
+
+: ALLR> ( -- n1 n2 ... nx ) \ move numbers from return stack
+         ( R: delimeter nx .. n1 )
+  R>
+  BEGIN
+    R> SWAP OVER
+    #LEAVE-DELIMETER =
+  UNTIL
+  >R DROP
+;
+
+: RESOLVE>_ALL ( delimeter x1 y1 x2 y2 .. xn yn -- ) \ resolve forward branches
+  BEGIN
+    DUP #LEAVE-DELIMETER <>
+  WHILE
+    [ASM] then [END-ASM]
+  REPEAT DROP
+;
+
+: xLOOP ( #DO xt -- ) \ compile LOOP/+LOOP
+    SWAP ?DO-LOOP
+    [ INTERPRETER ] COMPILE, [ HOST ] [ASM] vs until [END-ASM] RESOLVE>_ALL ;
+
+COMPILER
+
+: LEAVE
+    ALL>R
+        [ASM]
+            8 # sp sp add
+            A>MARK BNARROW,
+        [END-ASM]
+    ALLR>
+;
+
+: LOOP
+    '(LOOP) xLOOP ;
+: +LOOP
+    '(+LOOP) xLOOP ;
+
+\ literals compiling
+
+: LITERAL LITERAL, TRUE TO -ENQUEUE? ;
+: SLITERAL ( a u -- ) '(S") COMPILE, SLITERAL, ;
+: [CHAR]    BL WORD COUNT 0= ABORT" Need character" C@H
+    [COMPILE] LITERAL ;
+: [']
+    BL WORD TFIND DUP 0= ABORT" unknown (target) word"
+    0> ABORT" compiler word"
+    [COMPILE] LITERAL ;
+: ." ( -- ) '(.") (SLITERAL) ;
+: S" ( -- ) '(S") (SLITERAL) ;
+: ABORT" ( -- ) '(ABORT") (SLITERAL) ;
+: ASM{ ASM{ ;
+: }ASM }ASM ;
+
+\ data defining words
+HOST
+
+: DOES>NOTHING DOES> DROP ;
+
+: TARGET-COMPILE ( c-addr -- ) \ target-compile a word
+    [ INTERPRETER ]
+    TFIND CASE
+         1 OF EXECUTE>OPT OPT ENDOF  \ COMPILING
+        -1 OF DUP CFA>OPT COMPILE, OPT ENDOF \ TARGETING
+         0 OF COUNT PARSE-NUMBER DUP 0=
+            ABORT" unknown target word"
+            0< IF DROP LITERAL, ELSE DLITERAL, THEN
+        ENDOF
+    ENDCASE
+    [ HOST ]
+;
+
+INTERPRETER
+
+: constant  ( x "name" -- ) \ create a usual constant
+    HALIGN HERE DWARF_CREATE_VAR
+    >R  SAVE-SECTIONS  CDATA  (TCREATE) R> ,  RESTORE-SECTIONS \ create a constant in target space
+    DOCON CF!  \ compile a call to get a constant value
+    ZOMBIE-DOES> @ ; \ create a zombie
+
+: (INLINE-CONSTANT) ( x "name" -- ) \ create inline-optimized constant in COMPILING
+    CCREATE ,H  \ create a word in compiling vocabulary
+    DOES> @H LITERAL, TRUE TO -ENQUEUE? ; \ compile a literal
+
+: INLINE-CONSTANT ( n -- ) \ create inline-optimized constant in COMPILING and its zombie in INTERPRETING
+    >R SAVE-INPUT   R@ (INLINE-CONSTANT)   ?RESTORE-INPUT
+    R> ['] HCONSTANT IMAKE \ create zombie constant in INTERPRETING
+;
+
+: (INLINE-VALUE) ( x "name" -- ) \ create inline-optimized value in COMPILING
+    M?NAME
+    CCREATE ,H  \ create a word in compiling vocabulary
+    DOES>  @H LITERAL,  C" @" TARGET-COMPILE  ; \ compile 'LITERAL @'
+
+VECT COMPILE-INLINE-DEFER
+: (INLINE-DEFER) ( "name" -- ) \ create inline-optimized defer in COMPILING
+    M?NAME
+    CCREATE ,H  \ create a word in compiling vocabulary
+    DOES> @H COMPILE-INLINE-DEFER ;
+
+: (INLINE-FIELD) ( offset "name" -- ) \ create inline-optimized field in COMPILING
+    M?NAME
+    CCREATE ,H  \ create a word in compiling vocabulary
+    DOES>  @H LITERAL,  C" +" TARGET-COMPILE TRUE TO -ENQUEUE?  ; \ compile 'LITERAL +'
+
+: EQU ( x "name" -- ) \ inline constant
+    O_DEBUG IF ." Constant " D?NAME THEN
+    DUP DWARF_CREATE_CONST
+    INLINE-CONSTANT
+;
+
+: CONSTANT
+    EQU
+;
+
+: INLINE-CREATE ( "name" -- ) \ create inline variable
+    HERE DUP DWARF_CREATE_VAR
+    INLINE-CONSTANT
+;
+
+: CREATE  ( "name" -- ) \ usual create
+    0 constant \ create a constant
+    HERE LATEST @H CELL+ 2+ ! ; \ set a value for current address
+
+: VARIABLE ( "name" -- ) \ CELL inline variable in current section
+    O_MAP IF ." Variable " HERE M?NAME DROP THEN
+    INLINE-CREATE 1 CELLS ALLOT ;
+
+: CVARIABLE ( "name" -- ) \ CHAR inline variable in current section
+    O_MAP IF ." CVariable " HERE M?NAME DROP THEN
+    INLINE-CREATE 1 CHARS ALLOT ;
+
+: RESERVE ( n -- t-addr ) \ reserve n bytes in UDATA
+    >R SAVE-SECTIONS    UDATA HERE R> ALLOT >R   RESTORE-SECTIONS R>
+    O_MAP IF ." Reserve: " DUP U.H CR THEN
+;
+
+: BUFFER: ( n "name" -- ) \ create a named buffer of n bytes in UDATA
+    RESERVE
+    O_MAP IF ." Buffer: " M?NAME THEN
+    EQU ;
+
+: INLINE-VALUE ( n -- t_addr ) \ create a value in IDATA section and return its address
+    >R SAVE-SECTIONS
+        IDATA HERE
+        DUP DWARF_CREATE_VAR
+        DUP (INLINE-VALUE)
+        R> , \ store initial value
+    >R RESTORE-SECTIONS R>
+;
+
+: INLINE-DEFER ( -- t_addr ) \ create a DEFER in IDATA section and return its address
+    <SECTION-OVERRIDE DEFERERS
+        HERE
+        DUP DWARF_CREATE_VAR
+        DUP (INLINE-DEFER)
+        'NOOP 1+ , \ store initial value
+        >R
+    SECTION-OVERRIDE>
+    R>
+;
+
+: VALUE ( x "name" -- )
+    O_MAP IF ." Value " THEN
+    >R SAVE-INPUT   R> INLINE-VALUE >R   ?RESTORE-INPUT
+    GET-CURRENT ALSO INTERPRETING DEFINITIONS PREVIOUS R> HVALUE SET-CURRENT \ create a zombie value
+;
+
+: DEFER ( "name" -- )
+    O_MAP IF ." Defer " THEN
+    SAVE-INPUT   INLINE-DEFER >R   ?RESTORE-INPUT
+    GET-CURRENT ALSO INTERPRETING DEFINITIONS PREVIOUS R> HDEFER SET-CURRENT \ create a zombie defer
+;
+
+: -- ( base n "name" -- base+n ) \ create a field
+    O_MAP IF ." Field " THEN
+    OVER >R SAVE-INPUT   R> (INLINE-FIELD) ?RESTORE-INPUT
+    2>R GET-CURRENT ALSO INTERPRETING DEFINITIONS PREVIOUS 2R> -- >R SET-CURRENT R> \ create a zombie field
+;
+
+HOST
+
+: (TO) ( "name" -- t-addr )
+    ' >BODY @ ;
+
+INTERPRETER
+
+: TO ( x "name" -- ) \ for INTERPRETING
+    (TO)
+    ! \ store into section data
+;
+
+: IS ( t-xt "name" -- ) \ for interpreter
+    1+ \ thumb2 address must be odd
+    TO  ;
+
+\ TODO: user vars - ?
+\ task-local storage "user variables"
+\ ~ : UCREATE ( "name" -- )
+    \ ~ SAVE-SECTIONS CDATA (TCREATE) UHERE H, RESTORE-SECTIONS
+    \ ~ DOUSER CF! KILL-ZOMBIE ;
+\ ~ : USER ( "name" -- )    UALIGN UCREATE CELL UALLOT ;
+\ ~ : CUSER ( "name" -- ) UCREATE 1 CHARS UALLOT ;
+
+\ support for primitives (machine code definitions)
+INTERPRETER
+: (CODE) NEW 75757575 ASM{ ;
+: (END-CODE)  }ASM 75757575 <> ABORT" Stack not clean" DWARF_END_SUB ;
+: CODE ( "name" -- )
+    CREATE-GHOST   UNRESERVE   (CODE) ;
+: END-CODE ( -- ) (END-CODE) ;
+: LABEL ( "name" -- )
+    O_DEBUG IF ." Label " THEN
+    HALIGN  DWARF_CREATE_SUB
+    HERE  EQU (CODE) ;
+: END-LABEL ( -- ) (END-CODE) ;
+: INTERRUPT
+    LABEL 0 , END-LABEL
+;
+
+\ cross compilation interpreter loop
+HOST DECIMAL
+VARIABLE TSTATE 0 TSTATE !
+
+: TARGET-COMPILER ( -- )
+    1 TSTATE !
+    BEGIN
+        NEXT-WORD TARGET-COMPILE
+    TSTATE @ 0= UNTIL ;
+
+\ cross forth code compilation words
+HOST HEX
+
+: (TDOES>) ( t-addr -- )
+    [ INTERPRETER ] CF! [ HOST ] ?KILL-ZOMBIE ;
+
+INTERPRETER
+
+: ] TARGET-COMPILER ;
+: : ( "name" -- )
+    <SECTION-OVERRIDE COLON-DEFINITIONS \ see ; for corresponding SECTION-OVERRIDE>
+        CREATE-GHOST UNRESERVE
+        [ASM]
+            { lr }  push
+        [END-ASM]
+        NEW  ]
+;
+
+: HANDLER: ( "name" -- ) \ create interrupt handler
+    <SECTION-OVERRIDE COLON-DEFINITIONS
+        CREATE-GHOST UNRESERVE
+        [ASM]
+            { r4 r5 r6 r7 lr }  push
+        [END-ASM]
+        NEW  ]
+;
+
+: IRQ! ( handler address -- )
+    SWAP 1+ SWAP !
+;
+
+: :NONAME ( "name" -- xt )
+    <SECTION-OVERRIDE COLON-DEFINITIONS
+        CREATE-GHOST-NONAME OVER 1+ -ROLL
+        UNRESERVE CLEAR_SUB [COMPILE] ]
+;
+
+: DOES>
+    <SECTION-OVERRIDE COLON-DEFINITIONS HALIGN HERE >R SECTION-OVERRIDE>
+    [ HOST ]    R> POSTPONE LITERAL POSTPONE (TDOES>) POSTPONE ;
+    [ INTERPRETER ]
+    <SECTION-OVERRIDE COLON-DEFINITIONS CLEAR_SUB [ASM] pusht    [ lr ] tos ldr [END-ASM]
+    [COMPILE] ] ; IMMEDIATE
+
+: IMMEDIATE \ todo: generate error when used on headless code? ignore?
+    LINK @H CFA>NFA 40 TOGGLE ;
+
+COMPILER HEX
+
+: [   0 TSTATE !H ;
+: ;   next, [COMPILE] [ SECTION-OVERRIDE> DWARF_END_SUB ;
+: ;HANDLER
+    [ASM]
+        { r4 r5 r6 r7 pc }  pop
+    [END-ASM]
+    [COMPILE] [ SECTION-OVERRIDE> DWARF_END_SUB
+;
+
+\ support for postpone in 'compiler' definitions
+HOST ALSO POSTPONING DEFINITIONS PREVIOUS
+: POSTPONE ( "name" -- )
+    BL WORD TFIND DUP 0= ABORT" unknown (target) word"
+    SWAP POSTPONE LITERAL
+    0> IF  \ compiling
+        POSTPONE EXECUTE
+    ELSE  \ targeting
+        [[ ALSO INTERPRETING ]]  POSTPONE COMPILE, [[ PREVIOUS ]]
+    THEN
+; IMMEDIATE
+
+\ conditional compilation on target
+HOST
+: (IFDEF)  ALSO FORTH   BL WORD FIND   PREVIOUS  NIP POSTPONE [IF] ;
+: (TIFDEF)  BL WORD TFIND NIP POSTPONE [IF] ;
+: (TIFUNDEF)    BL WORD TFIND NIP 0= POSTPONE [IF] ;
+
+INTERPRETER
+: [IFDEF]   (TIFDEF) ; IMMEDIATE
+: [IFDEF_H]   (IFDEF) ; IMMEDIATE
+: [IFUNDEF] (TIFUNDEF) ; IMMEDIATE
+: [THEN] ; IMMEDIATE
+
+COMPILER
+: [IFDEF]   (TIFDEF) ;
+: [IFDEF_H]   (IFDEF) ;
+: [IFUNDEF] (TIFUNDEF) ;
+: [THEN] ;
+
+\ more target memory and section handling code
+HOST DECIMAL
+12 VALUE DOIMAGE
+
+INTERPRETER
+: DUMP ( t-addr n -- ) SWAP TADDR>ADDR SWAP DUMP ;
+: ERASE ( t-addr n -- ) SWAP TADDR>ADDR SWAP ERASE ;
+: BLANK ( t-addr n -- ) SWAP TADDR>ADDR SWAP BLANK ;
+: FILL ( t-addr n c -- ) ROT TADDR>ADDR -ROT FILL ;
+: MOVE ( t-addr1 t-addr2 n -- ) ROT TADDR>ADDR ROT TADDR>ADDR ROT MOVE ;
+
+: CURRENT-SECTION-START ( -- x ) CURRENT-SECTION @H SECTION-TRANGE DROP ;
+: CURRENT-SECTION-END ( -- x ) CURRENT-SECTION @H SECTION-TRANGE NIP ;
+: UNUSED ( -- n ) SECTION-END HERE - ;
+
+: SECTION-IMAGE: ( "name" -- ) \ create image of current section in CDATA
+    ALIGN HERE CURRENT-SECTION-START 2>R
+    SAVE-SECTIONS CDATA (TCREATE)   DOIMAGE  CF!
+    2R> 2DUP , ,
+    ?DO I @ , 1 CELLS +LOOP
+    RESTORE-SECTIONS ;
+
+: DUMP-SECTION ( a u -- )
+    W/O CREATE-FILE THROW >R
+    HERE 1- TADDR>ADDR CURRENT-SECTION-START TADDR>ADDR
+    TUCK - 1+ R@ WRITE-FILE THROW
+    R> CLOSE-FILE THROW ;
+
+: DUMP-SECTION: ( "filename" -- )
+    BL WORD COUNT DUMP-SECTION
+;
+
+HOST
+
+: .SECTION ( section -- )
+    BASE @ >R HEX
+    >R
+        R@ SECTION-START 9 U.R
+        R@ SECTION-END 9 U.R
+        DECIMAL
+        R@ SECTION-TRANGE SWAP - 1+ 9 U.R
+        R@ SECTION-THERE R@ SECTION-START - 9 U.R
+        R@ SECTION-END R@ SECTION-THERE - 1+ 9 U.R
+        R@ section-type @ GET-SECTION-TYPE 9 TYPE.R
+        R@ ID. 9 TYPE.R
+    RDROP
+    R> BASE !
+    CR
+;
+
+: .SECTIONS ( -- )
+    LAST-SECTION @
+    BEGIN DUP WHILE
+        DUP .SECTION
+        section-link @ \ continue loop with next section
+    REPEAT DROP ;
+
+: .SUMMARY
+    CR ."     Start      End     Size     Used   Unused     Type     Name" CR
+    .SECTIONS
+;
+
+INTERPRETER
+
+\ device register gefinitions
+
+: REG: ( base offset -- base )
+    OVER +
+    O_CONSTANTS O_HEADERS AND IF \ include if headers and constants options enabled
+        >R
+        SAVE-INPUT CODE [ASM] R@ pusht tos #mov ret [END-ASM] END-CODE \ make constant in target
+        ?RESTORE-INPUT
+        R>
+    THEN
+    EQU
+;
+
+: BASE: ( base offset -- base )
+    REG:
+;
+
+: FIELD: ( offset width -- offset+width )
+    SWAP 0 REG: +
+;
+
+\ ~ COMPILER
+\ ~
+\ ~ : BITS{
+  \ ~ ( [ ) 0 TSTATE !H ;
+\ ~
+\ ~ INTERPRETER
+\ ~
+\ ~ : }BITS
+  \ ~ BIT [ ALSO COMPILING ] POSTPONE LITERAL POSTPONE ] ;
+\ ~
+
+HOST
+

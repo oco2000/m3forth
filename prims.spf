@@ -1,0 +1,666 @@
+\
+\ Primitives
+\
+
+TARGET CDATA  DECIMAL
+
+TARGET CODE NOOP \ noop
+    ret
+END-CODE  ' NOOP HOST TO 'NOOP
+
+TARGET LABEL DOCON ( lr - addr of PFA )
+    pusht
+    [ 1 # lr -] tos ldr
+    [ tos ] tos ldr
+    next,
+END-LABEL  DOCON HOST TO DOCON
+
+TARGET LABEL DODEFER
+    [ 1 # lr -] tmp ldr
+    [ tmp ] tmp ldr
+    lr pop
+    tmp bx
+END-LABEL  DODEFER HOST TO DODEFER
+
+
+TARGET LABEL DOUSER
+    ret
+END-LABEL  DOUSER HOST TO DOUSER
+
+TARGET CODE EXECUTE
+    1 # tos tmp adds
+    popt
+    tmp bx
+END-CODE
+
+TARGET CODE ROT ( x1 x2 x3 -- x2 x3 x1)
+    tos tmp movs
+    { tmp1 tos } pops
+    { tmp tmp1 } pushs
+    ret
+END-CODE
+
+TARGET CODE -ROT ( x1 x2 x3 -- x3 x1 x2)
+    { tmp tmp1 } pops
+    { tmp1 tos } pushs
+    tmp tos movs
+    ret
+END-CODE
+
+TARGET CODE 2SWAP ( d1 d2 -- d2 d1)
+    tos tmp mov
+    { tmp1 tmp2 tmp3 } pops
+    { tmp tmp1 } pushs
+    tmp3 pushreg
+    tmp2 tos mov
+    ret
+END-CODE
+
+TARGET CODE 2OVER ( d1 d2 -- d1 d2 d1)
+    { tmp tmp1 tmp2 } pops
+    3 CELLS # fsp subs
+    { tmp2 tos } pushs
+    tmp1 tos mov
+    ret
+END-CODE
+
+TARGET CODE !
+    { tmp tmp1 }  pops
+    [ tos ] tmp   str
+    tmp1 tos      movs
+    ret
+END-CODE
+
+TARGET CODE SWAP!
+    { tmp tmp1 }  pops
+    [ tmp ] tos   str
+    tmp1 tos      movs
+    ret
+END-CODE
+
+TARGET CODE C!
+    { tmp tmp1 }  pops
+    [ tos ] tmp   strb
+    tmp1 tos      movs
+    ret
+END-CODE
+
+TARGET CODE H!
+    { tmp tmp1 }  pops
+    [ tos ] tmp   strh
+    tmp1 tos      movs
+    ret
+END-CODE
+
+TARGET CODE SWAPH!
+    { tmp tmp1 }  pops
+    [ tmp ] tos   strh
+    tmp1 tos      movs
+    ret
+END-CODE
+
+TARGET CODE 2@ ( addr -- d )
+   [ 4 # tos +] tmp ldr
+   pushtmp
+   [ tos ] tos ldr
+   ret
+END-CODE
+
+TARGET CODE 2! ( d addr -- )
+   tos tmp mov \ tmp = addr
+   { tmp1 tmp2 tos } pops \ tmp1:tmp2 - d
+\   { tmp1 tmp2 } tmp stm
+   [ 4 # tmp +] tmp2 str
+   [ tmp ] tmp1 str
+   ret
+END-CODE
+
+TARGET CODE TOGGLE
+    { tmp tmp1 }  pops
+    [ tmp ] tmp2  ldrb
+    tos tmp2      eors
+    [ tmp ] tmp2  strb
+    tmp1 tos      movs
+    ret
+END-CODE
+
+TARGET CODE MIN
+    poptmp
+    tos tmp      cmp
+    lt it
+        tmp tos  mov
+    ret
+END-CODE
+
+TARGET CODE MAX
+    poptmp
+    tos tmp      cmp
+    gt it
+        tmp tos  mov
+    ret
+END-CODE
+
+TARGET CODE +!
+    { tmp tmp1 }     pops
+    [ tos ] tmp2     ldr
+    tmp tmp2 tmp2    adds
+    [ tos ] tmp2     str
+    tmp1     tos     mov
+    ret
+END-CODE
+
+TARGET CODE ?DUP
+    tos tos tst
+    ne it
+        pusht
+    ret
+END-CODE
+
+TARGET CODE <>
+    poptmp
+    tmp tos  eors
+    ne it
+        -1 # tos mov
+    ret
+END-CODE
+
+TARGET CODE =
+    poptmp
+    tmp  tos eors
+    ne it
+        -1 # tos mov
+    tos tos mvns
+    ret
+END-CODE
+
+TARGET CODE >
+    poptmp
+    tos tmp cmp
+    le ite
+        0 tos #mov
+    \ else
+        -1 tos #mov
+    ret
+END-CODE
+
+TARGET CODE <
+    poptmp
+    tmp tos cmp
+    le ite
+        0 tos #mov
+    \ else
+        -1 tos #mov
+    ret
+END-CODE
+
+TARGET CODE >=
+    poptmp
+    tmp tos cmp
+    le ite
+        -1 tos #mov
+    \ else
+        0 tos #mov
+    ret
+END-CODE
+
+TARGET CODE <=
+    poptmp
+    tos tmp cmp
+    le ite
+        -1 tos #mov
+    \ else
+        0 tos #mov
+    ret
+END-CODE
+
+TARGET CODE 0<>
+    tos tos orrs
+    ne it
+        -1 # tos movs
+    ret
+END-CODE
+
+TARGET CODE 0=
+    tos tos orrs
+    ne it
+        -1 # tos movs
+    tos tos mvns
+    ret
+END-CODE
+
+TARGET CODE 0>
+    tos tos orrs
+    ne ite
+        -1 # tos movs
+    \ else
+         0 # tos movs
+    ret
+END-CODE
+
+TARGET CODE U<
+    poptmp
+    tos tmp      cmp
+    tmp tmp tos  sbc
+    ret
+END-CODE
+
+TARGET CODE U>
+    poptmp
+    tmp tos      cmp
+    tmp tmp tos  sbc
+    ret
+END-CODE
+
+TARGET CODE WITHIN ( n l h -- t)
+   { tmp tmp1 } pops
+   tmp tos tos subs
+   tmp tmp1 tmp1 subs
+   tos tmp1 tmp1 subs
+   tos tos sbcs
+   ret
+END-CODE
+
+TARGET CODE M* ( n1  n2 -- d )
+    [ fsp ] tmp  ldr
+    tos tmp  tos tmp smull
+    [ fsp ] tmp  str
+    ret
+END-CODE
+
+TARGET CODE UM* ( u1  u2 -- ud )
+    [ fsp ] tmp  ldr
+    tos tmp  tos tmp umull
+    [ fsp ] tmp  str
+    ret
+END-CODE
+
+\ tos - denominator
+\ tmp2:tmp3 - dividend
+\ tmp3 - quotient
+\ tmp2 - remainder
+LABEL div64
+    0 # tmp1 movs
+    32 # tmp movs \ counter
+    begin
+        tmp3 tmp3 tmp3 adds \ shift lsb
+        tmp2 tmp2 adcs \ shift msb
+        cs if
+            tos tmp2 tmp2 subs \ tmp2 = tmp2 - tos
+            1 # tmp3 adds
+        else
+            tos tmp2 tmp2 subs \ tmp2 = tmp2 - tos
+            cs ite \ if tmp2>=tos   flag c is set when NO BORROW!
+                1 # tmp3 adds
+            \ else
+                tos tmp2 tmp2 adds
+        then
+        1 # tmp subs
+    eq until
+    ret
+END-CODE
+
+TARGET CODE UM/MOD ( ud u1 -- u2 u3 )
+    { lr } push
+    { tmp2 tmp3 } pops
+    div64 # bl
+    tmp2 pushreg
+    tmp3 tos movs
+    next,
+END-CODE
+
+CODE DNEGATE ( d1 -- d2 )
+    [ fsp ] tmp ldr
+    tos tmp1 mov
+    0 # tos movs
+    tmp tmp rsbs
+    tmp1 tos sbcs
+    [ fsp ] tmp str
+    ret
+END-CODE
+
+CODE D+ ( d1 d2 -- d3 )
+    { tmp tmp1 tmp2 } pops
+    tmp2 tmp tmp adds
+    tmp1 tos adcs
+    pushtmp
+    ret
+END-CODE
+
+CODE D- ( d1 d2 -- d3 )
+    { tmp tmp1 tmp2 } pops
+    tmp2 tmp tmp rsbs
+    tos tmp1 sbcs
+    tmp1 tos mov
+    pushtmp
+    ret
+END-CODE
+
+CODE D< ( d1 d2 -- flag )
+    { tmp tmp1 tmp2 } pops
+    tmp2 tmp tmp rsbs
+    tos tmp1 sbcs
+    lt ite
+        -1 tos #mov
+    \ else
+        0 tos #mov
+    ret
+END-CODE
+
+CODE DU< ( d1 d2 -- flag )
+    { tmp tmp1 tmp2 } pops
+    tmp2 tmp tmp rsbs
+    tos tmp1 sbcs
+    cs ite
+        1 tos #mov
+    \ else
+        0 tos #mov
+    ret
+END-CODE
+
+CODE D2* ( d1 -- d2 )
+    [ fsp ] tmp ldr
+    tmp tmp tmp adds
+    tos tos adcs
+    [ fsp ] tmp str
+    ret
+END-CODE
+
+CODE D2/ ( d1 -- d2 )
+    [ fsp ] tmp ldr
+    1 # tmp tmp lsrs
+    1 # tos tos asrs
+    cs itt
+        0x80000000 tmp1 #mov
+        tmp1 tmp orrs
+    [ fsp ] tmp str
+    ret
+END-CODE
+
+CODE COUNT ( addr1 -- addr2 n )
+    [ 1 # tos ]+ tmp ldrb
+    pusht
+    tmp tos mov
+    ret
+END-CODE
+
+TARGET CODE FILL  ( c-addr1 u1 tos -- )
+    { tmp tmp1 tmp2 } pops    \ tmp=u1 tmp1=c-addr1 tmp2=new-tos
+    begin
+        1 # tmp subs       \ count down, end reached?
+        hs it
+            [ tmp1 1 # ]+  tos strb    \ if not end: write byte..
+    hs until-not              \ and continue
+    tmp2 tos mov
+    ret
+END-CODE
+
+TARGET CODE CMOVE  ( src dst tos-u -- )
+    { tmp tmp1 tmp2 } pops    \ tmp=dst tmp1=src tmp2=new-tos
+    begin
+        1 # tos subs          \ count down. end reached?
+        hs itt
+            [ tmp1 1 # ]+ tmp3  ldrb    \ if not: copy one byte..
+            [ tmp  1 # ]+ tmp3  strb
+    hs until-not                \ .. and continue loop
+    tmp2 tos mov
+    ret
+END-CODE
+
+TARGET CODE CMOVE>  ( src dst tos-u -- )
+    { tmp tmp1 tmp2 } pops    \ tmp=dst tmp1=src tmp2=new-tos
+    tos tmp tmp adds \ tmp = dst end
+    tos tmp1 tmp1 adds \ tmp1 = src end
+    begin
+        1 # tos subs          \ count down. end reached?
+        hs itt
+            [ tmp1 1 # -]! tmp3  ldrb    \ if not: copy one byte..
+            [ tmp  1 # -]! tmp3  strb
+    hs until-not                \ .. and continue loop
+    tmp2 tos mov
+    ret
+END-CODE
+
+TARGET CODE (DO) ( n1|u1 n2|u2 -- ) ( R: -- x1 x2 )
+    tos tmp movs
+    { tmp1 tos } pops                 \ tmp=index, tmp1=limit
+    0x80000000 # tmp2 movs
+    tmp2 tmp1 eors
+    tmp1 tmp tmp subs
+    { tmp1 tmp } push
+    ret
+END-CODE    ' (DO) HOST TO '(DO)
+
+TARGET CODE (?DO) ( n1|u1 n2|u2 -- ) ( R: -- x1 x2 )
+    tos tmp movs
+    { tmp1 tos } pops                 \ tmp=index, tmp1=limit
+    tmp1 tmp cmp
+    ne if                \ Return if same with Z set
+        0x80000000 # tmp2 mov
+        tmp2 tmp1 eors
+        tmp1 tmp tmp sub
+        { tmp1 tmp } push
+    then
+    ret
+END-CODE      ' (?DO) HOST TO '(?DO)
+
+TARGET CODE (LOOP) ( -- ) ( R: x1 x2 -- x3 x2 | )
+    { tmp } pop
+    1 # tmp adds
+    { tmp } push
+    vs if
+        8 # sp sp add
+    then
+    ret
+END-CODE    ' (LOOP) HOST TO '(LOOP)
+
+TARGET CODE (+LOOP) ( n -- ) ( R: x1 x2 -- x3 x2 | )
+    { tmp } pop
+    tos tmp tmp adds
+    popt
+    { tmp } push
+    vs if
+        8 # sp sp add
+    then
+    ret
+END-CODE    ' (+LOOP) HOST TO '(+LOOP)
+
+TARGET CODE I ( -- n ) ( R: x1 x2 -- x1 x2 )
+    pusht
+    [ sp ] tmp ldr
+    [ 4 # sp +] tos ldr
+    tmp tos tos adds
+    ret
+END-CODE
+
+TARGET CODE J ( -- n )
+    pusht
+    [ 8  # sp +] tmp ldr
+    [ 12 # sp +] tos ldr
+    tmp tos tos adds
+    ret
+END-CODE
+
+TARGET LABEL DOIMAGE
+    1 # lr lr subs
+    [ lr 4 # ]+  tmp  ldr    \ tmp = section start address
+    [ lr 4 # ]+  tmp2 ldr    \ tmp2 = first address after end of section
+    begin
+        tmp    tmp2   cmp    \ end-address reached?
+        ne itt
+            [ lr  4 # ]+  tmp1 ldr \ copy one word of data ...
+            [ tmp 4 # ]+  tmp1 str
+    ne until-not        \ ...and continue if end not yet reached
+    { pc } pop
+END-LABEL   DOIMAGE HOST TO DOIMAGE
+
+\ ~ TARGET CODE TP! \ "task pointer"
+    \ ~ TOS          FTP MOV,
+    \ ~ FSP 4 ]#     TOS LDR,
+    \ ~ ret
+\ ~ end-code
+
+TARGET CODE 2>R  ( S: x2 x1 tos1 -- tos2  R: -- x1 tos1 )
+    tos tmp mov
+    { tmp1 tos } pops
+    { tmp tmp1 } push
+    ret
+END-CODE
+
+TARGET CODE 2R>  ( S: tos1 -- tos1 x2 x1  R: x2 x1 -- )
+    { tmp tmp1 } pop
+    { tmp1 tos } pushs
+    tmp tos mov
+    ret
+END-CODE
+
+TARGET CODE 2R@ ( -- x1 x2 ) ( R: x1 x2 -- x1 x2 )
+    [ sp ] tmp ldr
+    [ 4 # sp +] tmp1 ldr
+    { tmp1 tos } pushs
+    tmp tos mov
+    ret
+END-CODE
+
+TARGET CODE N>R ( x1 ... xn n -- R: xn ... x1 n )
+    tos tmp mov
+    tos tmp1 mov
+    popt
+    begin
+        { tos } push
+        popt
+        1 # tmp subs
+    eq until
+    { tmp1 } push
+    ret
+END-CODE
+
+TARGET CODE NR> ( R: xn ... x1 n -- x1 ... xn )
+    { tmp } pop
+    tmp tmp1 mov
+    begin
+        pusht
+        { tos } pop
+        1 # tmp subs
+    eq until
+    pusht
+    tmp1 tos mov
+    ret
+END-CODE
+
+TARGET CODE ANDC ( n1 n2 -- n1 & !n2 )
+    tos tmp mov
+    popt
+    tmp tos bics
+    ret
+END-CODE
+
+\ bit-banding
+\ SRAM:   0x20000000 - 0x200FFFFF -> 0x22000000 - 0x23FFFFFF
+\ PERIPH: 0x40000000 - 0x400FFFFF -> 0x42000000 - 0x43FFFFFF
+
+INTERPRETER
+: BB_ADDRESS
+\ get bitband address in tmp for offset in tmp and bit# in tos
+\ uses tmp2, tmp3
+    [ASM]
+        0xFFFFF tmp2 #mov
+        tmp tmp2 tmp3 ands \ tmp3 - offset
+        tmp2 tmp bics \ mask address
+        0x02000000 # tmp tmp orr
+        5 #lsl tmp3 tmp tmp add \ add offset * 32
+        2 #lsl tos tmp tmp add \ add bit# * 4
+    [END-ASM]
+;
+
+TARGET CODE BITSET ( addr #bit -- )
+    { tmp tmp1 } pops \ tmp - address
+    BB_ADDRESS
+    1 tos #mov
+    [ tmp ] tos str
+    tmp1 tos mov
+    ret
+END-CODE
+
+TARGET CODE BITCLEAR ( addr #bit -- )
+    { tmp tmp1 } pops \ tmp - address
+    BB_ADDRESS
+    0 tos #mov
+    [ tmp ] tos str
+    tmp1 tos mov
+    ret
+END-CODE
+
+TARGET CODE BITSWITCH ( addr #bit -- )
+    { tmp tmp1 } pops \ tmp - address
+    BB_ADDRESS
+    [ tmp ] tos ldr
+    1 # tos tos adds
+    [ tmp ] tos str
+    tmp1 tos mov
+    ret
+END-CODE
+
+\ bit operations
+
+TARGET CODE BSET ( #bit addr -- )
+    { tmp tmp1 } pops \ tmp - bit#, tos - address
+    1 tmp2 #mov
+    tmp tmp2 lsls \ tmp2 - mask
+    [ tos ] tmp3 ldr
+    tmp2 tmp3 orrs \ or with mask
+    [ tos ] tmp3 str
+    tmp1 tos mov
+    ret
+END-CODE
+
+TARGET CODE BCLEAR ( addr #bit -- )
+    { tmp tmp1 } pops \ tmp - bit#, tos - address
+    1 tmp2 #mov
+    tmp tmp2 lsls \ tmp2 - mask
+    [ tos ] tmp3 ldr
+    tmp2 tmp3 bics \ and with ~mask
+    [ tos ] tmp3 str
+    tmp1 tos mov
+    ret
+END-CODE
+
+TARGET CODE BSWITCH ( addr #bit -- )
+    { tmp tmp1 } pops \ tmp - bit#, tos - address
+    1 tmp2 #mov
+    tmp tmp2 lsls \ tmp2 - mask
+    [ tos ] tmp3 ldr
+    tmp2 tmp3 eors \ xor with mask
+    [ tos ] tmp3 str
+    tmp1 tos mov
+    ret
+END-CODE
+
+TARGET CODE SET ( mask addr -- )
+    { tmp tmp1 } pops \ tmp - mask, tos - address
+    [ tos ] tmp3 ldr
+    tmp tmp3 orrs \ or with mask
+    [ tos ] tmp3 str
+    tmp1 tos mov
+    ret
+END-CODE
+
+TARGET CODE CLEAR ( mask addr -- )
+    { tmp tmp1 } pops \ tmp - mask, tos - address
+    [ tos ] tmp3 ldr
+    tmp tmp3 bics \ and with ~mask
+    [ tos ] tmp3 str
+    tmp1 tos mov
+    ret
+END-CODE
+
+TARGET CODE SWITCH ( mask addr -- )
+    { tmp tmp1 } pops \ tmp - mask, tos - address
+    [ tos ] tmp3 ldr
+    tmp tmp3 eors \ xor with mask
+    [ tos ] tmp3 str
+    tmp1 tos mov
+    ret
+END-CODE
+
+HOST
+

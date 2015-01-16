@@ -1,0 +1,757 @@
+REQUIRE 2CONSTANT lib/include/double.f
+
+BASE @ DECIMAL
+
+USE libdwarf.so
+\ in ubuntu you need to build it from source:
+\   apt-get source libdwarf-dev
+\   ./configure --enable-shared --disable-nonshared
+\   make
+\   sudo cp libdwarf.so /usr/lib
+
+\ ~ typedef int                 Dwarf_Bool;     /* boolean type */
+\ ~ typedef unsigned long long  Dwarf_Off;      /* 8 byte file offset */
+\ ~ typedef unsigned long long  Dwarf_Unsigned; /* 8 byte unsigned value*/
+\ ~ typedef unsigned short      Dwarf_Half;     /* 2 byte unsigned value */
+\ ~ typedef unsigned char       Dwarf_Small;    /* 1 byte unsigned value */
+\ ~ typedef signed   long long  Dwarf_Signed;   /* 8 byte signed value */
+\ ~ typedef unsigned long long  Dwarf_Addr;     /* target memory address */
+
+\ dwarf_init() access arguments
+
+0 CONSTANT DW_DLC_READ               \ read only access
+1 CONSTANT DW_DLC_WRITE              \ write only access
+2 CONSTANT DW_DLC_RDWR               \ read/write access NOT SUPPORTED
+
+\ dwarf_producer_init*() access flag modifiers
+\   If HAVE_DWARF2_99_EXTENSION is defined at libdwarf build time
+\   and DW_DLC_OFFSET_SIZE_64  is passed in producer_init()
+\   flags then the DWARF3 64 bit offset extension is used
+\   to generate 64 bit offsets.
+
+0x40000000 CONSTANT DW_DLC_SIZE_64         \ 64-bit address-size target
+0x20000000 CONSTANT DW_DLC_SIZE_32         \ 32-bit address-size target
+0x10000000 CONSTANT DW_DLC_OFFSET_SIZE_64  \ 64-bit offset-size DWARF
+
+\ dwarf_producer_init*() access flag modifiers
+
+0x00000000 CONSTANT DW_DLC_ISA_MIPS             \ MIPS target
+0x01000000 CONSTANT DW_DLC_ISA_IA64             \ IA64 target
+0x02000000 CONSTANT DW_DLC_STREAM_RELOCATIONS   \ Old style binary relocs
+
+    \  Usable with assembly output because it is up to the producer to
+    \    deal with locations in whatever manner the producer code wishes.
+    \    Possibly emitting text an assembler will recognize.
+0x04000000 CONSTANT DW_DLC_SYMBOLIC_RELOCATIONS
+
+0x08000000 CONSTANT DW_DLC_TARGET_BIGENDIAN     \ Big    endian target
+0x00100000 CONSTANT DW_DLC_TARGET_LITTLEENDIAN  \ Little endian target
+
+\ error return values
+-1. 2CONSTANT DW_DLV_BADADDR
+    \ for functions returning target address
+-1. 2CONSTANT DW_DLV_NOCOUNT
+    \ for functions returning count
+-1. 2CONSTANT DW_DLV_BADOFFSET
+    \ for functions returning offset
+\ standard return values for functions
+-1 CONSTANT DW_DLV_NO_ENTRY
+ 0 CONSTANT DW_DLV_OK
+ 1 CONSTANT DW_DLV_ERROR
+
+
+
+0x01 CONSTANT DW_TAG_array_type
+0x02 CONSTANT DW_TAG_class_type
+0x03 CONSTANT DW_TAG_entry_point
+0x04 CONSTANT DW_TAG_enumeration_type
+0x05 CONSTANT DW_TAG_formal_parameter
+0x08 CONSTANT DW_TAG_imported_declaration
+0x0A CONSTANT DW_TAG_label
+0x0B CONSTANT DW_TAG_lexical_block
+0x0D CONSTANT DW_TAG_member
+0x0F CONSTANT DW_TAG_pointer_type
+0x10 CONSTANT DW_TAG_reference_type
+0x11 CONSTANT DW_TAG_compile_unit
+0x12 CONSTANT DW_TAG_string_type
+0x13 CONSTANT DW_TAG_structure_type
+0x15 CONSTANT DW_TAG_subroutine_type
+0x16 CONSTANT DW_TAG_typedef
+0x17 CONSTANT DW_TAG_union_type
+0x18 CONSTANT DW_TAG_unspecified_parameters
+0x19 CONSTANT DW_TAG_variant
+0x1A CONSTANT DW_TAG_common_block
+0x1B CONSTANT DW_TAG_common_inclusion
+0x1C CONSTANT DW_TAG_inheritance
+0x1D CONSTANT DW_TAG_inlined_subroutine
+0x1E CONSTANT DW_TAG_module
+0x1F CONSTANT DW_TAG_ptr_to_member_type
+0x20 CONSTANT DW_TAG_set_type
+0x21 CONSTANT DW_TAG_subrange_type
+0x22 CONSTANT DW_TAG_with_stmt
+0x23 CONSTANT DW_TAG_access_declaration
+0x24 CONSTANT DW_TAG_base_type
+0x25 CONSTANT DW_TAG_catch_block
+0x26 CONSTANT DW_TAG_const_type
+0x27 CONSTANT DW_TAG_constant
+0x28 CONSTANT DW_TAG_enumerator
+0x29 CONSTANT DW_TAG_file_type
+0x2A CONSTANT DW_TAG_friend
+0x2B CONSTANT DW_TAG_namelist
+        \  Early releases of this header had the following misspelled with a trailing 's'
+0x2C CONSTANT DW_TAG_namelist_item            \ DWARF3/2 spelling
+0x2C CONSTANT DW_TAG_namelist_items           \ SGI misspelling/typo
+0x2D CONSTANT DW_TAG_packed_type
+0x2E CONSTANT DW_TAG_subprogram
+        \  The DWARF2 document had two spellings of the following two TAGs, DWARF3 specifies the longer spelling.
+0x2F CONSTANT DW_TAG_template_type_parameter  \ DWARF3/2 spelling
+0x2F CONSTANT DW_TAG_template_type_param      \ DWARF2   spelling
+0x30 CONSTANT DW_TAG_template_value_parameter \ DWARF3/2 spelling
+0x30 CONSTANT DW_TAG_template_value_param     \ DWARF2   spelling
+0x31 CONSTANT DW_TAG_thrown_type
+0x32 CONSTANT DW_TAG_try_block
+0x33 CONSTANT DW_TAG_variant_part
+0x34 CONSTANT DW_TAG_variable
+0x35 CONSTANT DW_TAG_volatile_type
+0x36 CONSTANT DW_TAG_dwarf_procedure           \ DWARF3
+0x37 CONSTANT DW_TAG_restrict_type             \ DWARF3
+0x38 CONSTANT DW_TAG_interface_type            \ DWARF3
+0x39 CONSTANT DW_TAG_namespace                 \ DWARF3
+0x3A CONSTANT DW_TAG_imported_module           \ DWARF3
+0x3B CONSTANT DW_TAG_unspecified_type          \ DWARF3
+0x3C CONSTANT DW_TAG_partial_unit              \ DWARF3
+0x3D CONSTANT DW_TAG_imported_unit             \ DWARF3
+        \  Do not use DW_TAG_mutable_type
+0x3E CONSTANT DW_TAG_mutable_type \ Withdrawn from DWARF3 by DWARF3f.
+0x3F CONSTANT DW_TAG_condition                 \ DWARF3f
+0x40 CONSTANT DW_TAG_shared_type               \ DWARF3f
+0x41 CONSTANT DW_TAG_type_unit                 \ DWARF4
+0x42 CONSTANT DW_TAG_rvalue_reference_type     \ DWARF4
+0x43 CONSTANT DW_TAG_template_alias            \ DWARF4
+0x4080 CONSTANT DW_TAG_lo_user
+
+0x4081 CONSTANT DW_TAG_MIPS_loop
+
+\ HP extensions: ftp://ftp.hp.com/pub/lang/tools/WDB/wdb-4.0.tar.gz
+0x4090 CONSTANT DW_TAG_HP_array_descriptor       \ HP
+
+\ GNU extensions.  The first 3 missing the GNU_.
+0x4101 CONSTANT DW_TAG_format_label             \ GNU. Fortran.
+0x4102 CONSTANT DW_TAG_function_template        \ GNU. For C++
+0x4103 CONSTANT DW_TAG_class_template           \ GNU. For C++
+0x4104 CONSTANT DW_TAG_GNU_BINCL                \ GNU
+0x4105 CONSTANT DW_TAG_GNU_EINCL                \ GNU
+
+\ GNU extension. http://gcc.gnu.org/wiki/TemplateParmsDwarf
+0x4106 CONSTANT DW_TAG_GNU_template_template_parameter  \ GNU
+0x4106 CONSTANT DW_TAG_GNU_template_template_param      \ GNU
+0x4107 CONSTANT DW_TAG_GNU_template_parameter_pack      \ GNU
+0x4108 CONSTANT DW_TAG_GNU_formal_parameter_pack        \ GNU
+
+0x4109 CONSTANT DW_TAG_GNU_call_site                    \ GNU
+0x410A CONSTANT DW_TAG_GNU_call_site_parameter          \ GNU
+
+\ ALTIUM extensions
+    \ DSP-C/Starcore __circ qualifier
+0x5101 CONSTANT DW_TAG_ALTIUM_circ_type         \ ALTIUM
+    \ Starcore __mwa_circ qualifier
+0x5102 CONSTANT DW_TAG_ALTIUM_mwa_circ_type     \ ALTIUM
+    \ Starcore __rev_carry qualifier
+0x5103 CONSTANT DW_TAG_ALTIUM_rev_carry_type    \ ALTIUM
+    \ M16 __rom qualifier
+0x5111 CONSTANT DW_TAG_ALTIUM_rom               \ ALTIUM
+
+\ The following 3 are extensions to support UPC
+0x8765 CONSTANT DW_TAG_upc_shared_type          \ UPC
+0x8766 CONSTANT DW_TAG_upc_strict_type          \ UPC
+0x8767 CONSTANT DW_TAG_upc_relaxed_type         \ UPC
+
+\ PGI (STMicroelectronics) extensions.
+0xA000 CONSTANT DW_TAG_PGI_kanji_type           \ PGI
+0xA020 CONSTANT DW_TAG_PGI_interface_block      \ PGI
+\ The following are SUN extensions
+0x4201 CONSTANT DW_TAG_SUN_function_template    \ SUN
+0x4202 CONSTANT DW_TAG_SUN_class_template       \ SUN
+0x4203 CONSTANT DW_TAG_SUN_struct_template      \ SUN
+0x4204 CONSTANT DW_TAG_SUN_union_template       \ SUN
+0x4205 CONSTANT DW_TAG_SUN_indirect_inheritance \ SUN
+0x4206 CONSTANT DW_TAG_SUN_codeflags            \ SUN
+0x4207 CONSTANT DW_TAG_SUN_memop_info           \ SUN
+0x4208 CONSTANT DW_TAG_SUN_omp_child_func       \ SUN
+0x4209 CONSTANT DW_TAG_SUN_rtti_descriptor      \ SUN
+0x420A CONSTANT DW_TAG_SUN_dtor_info            \ SUN
+0x420B CONSTANT DW_TAG_SUN_dtor                 \ SUN
+0x420C CONSTANT DW_TAG_SUN_f90_interface        \ SUN
+0x420D CONSTANT DW_TAG_SUN_fortran_vax_structure \ SUN
+0x42FF CONSTANT DW_TAG_SUN_hi                   \ SUN
+
+
+0xFFFF CONSTANT DW_TAG_hi_user
+
+0 CONSTANT DW_children_no
+1 CONSTANT DW_children_yes
+
+
+
+0x01 CONSTANT DW_FORM_addr
+0x03 CONSTANT DW_FORM_block2
+0x04 CONSTANT DW_FORM_block4
+0x05 CONSTANT DW_FORM_data2
+0x06 CONSTANT DW_FORM_data4
+0x07 CONSTANT DW_FORM_data8
+0x08 CONSTANT DW_FORM_string
+0x09 CONSTANT DW_FORM_block
+0x0A CONSTANT DW_FORM_block1
+0x0B CONSTANT DW_FORM_data1
+0x0C CONSTANT DW_FORM_flag
+0x0D CONSTANT DW_FORM_sdata
+0x0E CONSTANT DW_FORM_strp
+0x0F CONSTANT DW_FORM_udata
+0x10 CONSTANT DW_FORM_ref_addr
+0x11 CONSTANT DW_FORM_ref1
+0x12 CONSTANT DW_FORM_ref2
+0x13 CONSTANT DW_FORM_ref4
+0x14 CONSTANT DW_FORM_ref8
+0x15 CONSTANT DW_FORM_ref_udata
+0x16 CONSTANT DW_FORM_indirect
+0x17 CONSTANT DW_FORM_sec_offset              \ DWARF4
+0x18 CONSTANT DW_FORM_exprloc                 \ DWARF4
+0x19 CONSTANT DW_FORM_flag_present            \ DWARF4
+\ 0x1a thru 0x1f were left unused accidentally. Reserved for future use.
+0x20 CONSTANT DW_FORM_ref_sig8                \ DWARF4
+
+0x01 CONSTANT DW_AT_sibling
+0x02 CONSTANT DW_AT_location
+0x03 CONSTANT DW_AT_name
+0x09 CONSTANT DW_AT_ordering
+0x0A CONSTANT DW_AT_subscr_data
+0x0B CONSTANT DW_AT_byte_size
+0x0C CONSTANT DW_AT_bit_offset
+0x0D CONSTANT DW_AT_bit_size
+0x0F CONSTANT DW_AT_element_list
+0x10 CONSTANT DW_AT_stmt_list
+0x11 CONSTANT DW_AT_low_pc
+0x12 CONSTANT DW_AT_high_pc
+0x13 CONSTANT DW_AT_language
+0x14 CONSTANT DW_AT_member
+0x15 CONSTANT DW_AT_discr
+0x16 CONSTANT DW_AT_discr_value
+0x17 CONSTANT DW_AT_visibility
+0x18 CONSTANT DW_AT_import
+0x19 CONSTANT DW_AT_string_length
+0x1A CONSTANT DW_AT_common_reference
+0x1B CONSTANT DW_AT_comp_dir
+0x1C CONSTANT DW_AT_const_value
+0x1D CONSTANT DW_AT_containing_type
+0x1E CONSTANT DW_AT_default_value
+0x20 CONSTANT DW_AT_inline
+0x21 CONSTANT DW_AT_is_optional
+0x22 CONSTANT DW_AT_lower_bound
+0x25 CONSTANT DW_AT_producer
+0x27 CONSTANT DW_AT_prototyped
+0x2A CONSTANT DW_AT_return_addr
+0x2C CONSTANT DW_AT_start_scope
+0x2E CONSTANT DW_AT_bit_stride                        \ DWARF3 name
+0x2E CONSTANT DW_AT_stride_size                       \ DWARF2 name
+0x2F CONSTANT DW_AT_upper_bound
+0x31 CONSTANT DW_AT_abstract_origin
+0x32 CONSTANT DW_AT_accessibility
+0x33 CONSTANT DW_AT_address_class
+0x34 CONSTANT DW_AT_artificial
+0x35 CONSTANT DW_AT_base_types
+0x36 CONSTANT DW_AT_calling_convention
+0x37 CONSTANT DW_AT_count
+0x38 CONSTANT DW_AT_data_member_location
+0x39 CONSTANT DW_AT_decl_column
+0x3A CONSTANT DW_AT_decl_file
+0x3B CONSTANT DW_AT_decl_line
+0x3C CONSTANT DW_AT_declaration
+0x3D CONSTANT DW_AT_discr_list
+0x3E CONSTANT DW_AT_encoding
+0x3F CONSTANT DW_AT_external
+0x40 CONSTANT DW_AT_frame_base
+0x41 CONSTANT DW_AT_friend
+0x42 CONSTANT DW_AT_identifier_case
+0x43 CONSTANT DW_AT_macro_info
+0x44 CONSTANT DW_AT_namelist_item
+0x45 CONSTANT DW_AT_priority
+0x46 CONSTANT DW_AT_segment
+0x47 CONSTANT DW_AT_specification
+0x48 CONSTANT DW_AT_static_link
+0x49 CONSTANT DW_AT_type
+0x4A CONSTANT DW_AT_use_location
+0x4B CONSTANT DW_AT_variable_parameter
+0x4C CONSTANT DW_AT_virtuality
+0x4D CONSTANT DW_AT_vtable_elem_location
+0x4E CONSTANT DW_AT_allocated                         \ DWARF3
+0x4F CONSTANT DW_AT_associated                        \ DWARF3
+0x50 CONSTANT DW_AT_data_location                     \ DWARF3
+0x51 CONSTANT DW_AT_byte_stride                       \ DWARF3f
+0x51 CONSTANT DW_AT_stride                            \ DWARF3 (do not use)
+0x52 CONSTANT DW_AT_entry_pc                          \ DWARF3
+0x53 CONSTANT DW_AT_use_UTF8                          \ DWARF3
+0x54 CONSTANT DW_AT_extension                         \ DWARF3
+0x55 CONSTANT DW_AT_ranges                            \ DWARF3
+0x56 CONSTANT DW_AT_trampoline                        \ DWARF3
+0x57 CONSTANT DW_AT_call_column                       \ DWARF3
+0x58 CONSTANT DW_AT_call_file                         \ DWARF3
+0x59 CONSTANT DW_AT_call_line                         \ DWARF3
+0x5A CONSTANT DW_AT_description                       \ DWARF3
+0x5B CONSTANT DW_AT_binary_scale                      \ DWARF3f
+0x5C CONSTANT DW_AT_decimal_scale                     \ DWARF3f
+0x5D CONSTANT DW_AT_small                             \ DWARF3f
+0x5E CONSTANT DW_AT_decimal_sign                      \ DWARF3f
+0x5F CONSTANT DW_AT_digit_count                       \ DWARF3f
+0x60 CONSTANT DW_AT_picture_string                    \ DWARF3f
+0x61 CONSTANT DW_AT_mutable                           \ DWARF3f
+0x62 CONSTANT DW_AT_threads_scaled                    \ DWARF3f
+0x63 CONSTANT DW_AT_explicit                          \ DWARF3f
+0x64 CONSTANT DW_AT_object_pointer                    \ DWARF3f
+0x65 CONSTANT DW_AT_endianity                         \ DWARF3f
+0x66 CONSTANT DW_AT_elemental                         \ DWARF3f
+0x67 CONSTANT DW_AT_pure                              \ DWARF3f
+0x68 CONSTANT DW_AT_recursive                         \ DWARF3f
+0x69 CONSTANT DW_AT_signature                         \ DWARF4
+0x6A CONSTANT DW_AT_main_subprogram                   \ DWARF4
+0x6B CONSTANT DW_AT_data_bit_offset                   \ DWARF4
+0x6C CONSTANT DW_AT_const_expr                        \ DWARF4
+0x6D CONSTANT DW_AT_enum_class                        \ DWARF4
+0x6E CONSTANT DW_AT_linkage_name                      \ DWARF4
+
+\ In extensions, we attempt to include the vendor extension
+\   in the name even when the vendor leaves it out.
+
+\ HP extensions.
+0x2000 CONSTANT DW_AT_HP_block_index                     \ HP
+
+\ Follows extension so dwarfdump prints the most-likely-useful name.
+0x2000 CONSTANT DW_AT_lo_user
+
+0x2001 CONSTANT DW_AT_MIPS_fde                          \ MIPS/SGI
+0x2002 CONSTANT DW_AT_MIPS_loop_begin                   \ MIPS/SGI
+0x2003 CONSTANT DW_AT_MIPS_tail_loop_begin              \ MIPS/SGI
+0x2004 CONSTANT DW_AT_MIPS_epilog_begin                 \ MIPS/SGI
+0x2005 CONSTANT DW_AT_MIPS_loop_unroll_factor           \ MIPS/SGI
+0x2006 CONSTANT DW_AT_MIPS_software_pipeline_depth      \ MIPS/SGI
+0x2007 CONSTANT DW_AT_MIPS_linkage_name                 \ MIPS/SGI, GNU, and others.
+0x2008 CONSTANT DW_AT_MIPS_stride                       \ MIPS/SGI
+0x2009 CONSTANT DW_AT_MIPS_abstract_name                \ MIPS/SGI
+0x200A CONSTANT DW_AT_MIPS_clone_origin                 \ MIPS/SGI
+0x200B CONSTANT DW_AT_MIPS_has_inlines                  \ MIPS/SGI
+0x200C CONSTANT DW_AT_MIPS_stride_byte                  \ MIPS/SGI
+0x200D CONSTANT DW_AT_MIPS_stride_elem                  \ MIPS/SGI
+0x200E CONSTANT DW_AT_MIPS_ptr_dopetype                 \ MIPS/SGI
+0x200F CONSTANT DW_AT_MIPS_allocatable_dopetype         \ MIPS/SGI
+0x2010 CONSTANT DW_AT_MIPS_assumed_shape_dopetype       \ MIPS/SGI
+0x2011 CONSTANT DW_AT_MIPS_assumed_size                 \ MIPS/SGI
+
+\ HP extensions.
+0x2001 CONSTANT DW_AT_HP_unmodifiable                   \ conflict: MIPS
+0x2010 CONSTANT DW_AT_HP_actuals_stmt_list              \ conflict: MIPS
+0x2011 CONSTANT DW_AT_HP_proc_per_section               \ conflict: MIPS
+0x2012 CONSTANT DW_AT_HP_raw_data_ptr                   \ HP
+0x2013 CONSTANT DW_AT_HP_pass_by_reference              \ HP
+0x2014 CONSTANT DW_AT_HP_opt_level                      \ HP
+0x2015 CONSTANT DW_AT_HP_prof_version_id                \ HP
+0x2016 CONSTANT DW_AT_HP_opt_flags                      \ HP
+0x2017 CONSTANT DW_AT_HP_cold_region_low_pc             \ HP
+0x2018 CONSTANT DW_AT_HP_cold_region_high_pc            \ HP
+0x2019 CONSTANT DW_AT_HP_all_variables_modifiable       \ HP
+0x201A CONSTANT DW_AT_HP_linkage_name                   \ HP
+0x201B CONSTANT DW_AT_HP_prof_flags                     \ HP
+
+0x2001 CONSTANT DW_AT_CPQ_discontig_ranges              \ COMPAQ/HP
+0x2002 CONSTANT DW_AT_CPQ_semantic_events               \ COMPAQ/HP
+0x2003 CONSTANT DW_AT_CPQ_split_lifetimes_var           \ COMPAQ/HP
+0x2004 CONSTANT DW_AT_CPQ_split_lifetimes_rtn           \ COMPAQ/HP
+0x2005 CONSTANT DW_AT_CPQ_prologue_length               \ COMPAQ/HP
+
+0x2026 CONSTANT DW_AT_INTEL_other_endian                \ Intel, 1 if byte swapped.
+
+\ GNU extensions.
+0x2101 CONSTANT DW_AT_sf_names                          \ GNU
+0x2102 CONSTANT DW_AT_src_info                          \ GNU
+0x2103 CONSTANT DW_AT_mac_info                          \ GNU
+0x2104 CONSTANT DW_AT_src_coords                        \ GNU
+0x2105 CONSTANT DW_AT_body_begin                        \ GNU
+0x2106 CONSTANT DW_AT_body_end                          \ GNU
+0x2107 CONSTANT DW_AT_GNU_vector                        \ GNU
+
+\  Thread safety, see http://gcc.gnu.org/wiki/ThreadSafetyAnnotation .
+\  The values here are from gcc-4.6.2 include/dwarf2.h.  The
+\    values are not given on the web page at all, nor on web pages
+\    it refers to.
+0x2108 CONSTANT DW_AT_GNU_guarded_by                    \ GNU
+0x2109 CONSTANT DW_AT_GNU_pt_guarded_by                 \ GNU
+0x210A CONSTANT DW_AT_GNU_guarded                       \ GNU
+0x210B CONSTANT DW_AT_GNU_pt_guarded                    \ GNU
+0x210C CONSTANT DW_AT_GNU_locks_excluded                \ GNU
+0x210D CONSTANT DW_AT_GNU_exclusive_locks_required      \ GNU
+0x210E CONSTANT DW_AT_GNU_shared_locks_required         \ GNU
+
+\ See http://gcc.gnu.org/wiki/DwarfSeparateTypeInfo
+0x210F CONSTANT DW_AT_GNU_odr_signature                  \ GNU
+
+\  See  See http://gcc.gnu.org/wiki/TemplateParmsDwarf
+\  The value here is from gcc-4.6.2 include/dwarf2.h.  The value is
+\    not consistent with the web page as of December 2011.
+0x2110 CONSTANT DW_AT_GNU_template_name                  \ GNU
+\  The GNU call site extension.
+\    See http://www.dwarfstd.org/ShowIssue.php?issue=100909.2&type=open .
+0x2111 CONSTANT DW_AT_GNU_call_site_value               \ GNU
+0x2112 CONSTANT DW_AT_GNU_call_site_data_value          \ GNU
+0x2113 CONSTANT DW_AT_GNU_call_site_target              \ GNU
+0x2114 CONSTANT DW_AT_GNU_call_site_target_clobbered    \ GNU
+0x2115 CONSTANT DW_AT_GNU_tail_call                     \ GNU
+0x2116 CONSTANT DW_AT_GNU_all_tail_call_sites           \ GNU
+0x2117 CONSTANT DW_AT_GNU_all_call_sites                \ GNU
+0x2118 CONSTANT DW_AT_GNU_all_source_call_sites         \ GNU
+
+\ ALTIUM extension: ALTIUM Compliant location lists (flag)
+0x2300 CONSTANT DW_AT_ALTIUM_loclist              \ ALTIUM
+
+\ Sun extensions
+0x2201 CONSTANT DW_AT_SUN_template                      \ SUN
+0x2201 CONSTANT DW_AT_VMS_rtnbeg_pd_address             \ VMS
+0x2202 CONSTANT DW_AT_SUN_alignment                     \ SUN
+0x2203 CONSTANT DW_AT_SUN_vtable                        \ SUN
+0x2204 CONSTANT DW_AT_SUN_count_guarantee               \ SUN
+0x2205 CONSTANT DW_AT_SUN_command_line                  \ SUN
+0x2206 CONSTANT DW_AT_SUN_vbase                         \ SUN
+0x2207 CONSTANT DW_AT_SUN_compile_options               \ SUN
+0x2208 CONSTANT DW_AT_SUN_language                      \ SUN
+0x2209 CONSTANT DW_AT_SUN_browser_file                  \ SUN
+0x2210 CONSTANT DW_AT_SUN_vtable_abi                    \ SUN
+0x2211 CONSTANT DW_AT_SUN_func_offsets                  \ SUN
+0x2212 CONSTANT DW_AT_SUN_cf_kind                       \ SUN
+0x2213 CONSTANT DW_AT_SUN_vtable_index                  \ SUN
+0x2214 CONSTANT DW_AT_SUN_omp_tpriv_addr                \ SUN
+0x2215 CONSTANT DW_AT_SUN_omp_child_func                \ SUN
+0x2216 CONSTANT DW_AT_SUN_func_offset                   \ SUN
+0x2217 CONSTANT DW_AT_SUN_memop_type_ref                \ SUN
+0x2218 CONSTANT DW_AT_SUN_profile_id                    \ SUN
+0x2219 CONSTANT DW_AT_SUN_memop_signature               \ SUN
+0x2220 CONSTANT DW_AT_SUN_obj_dir                       \ SUN
+0x2221 CONSTANT DW_AT_SUN_obj_file                      \ SUN
+0x2222 CONSTANT DW_AT_SUN_original_name                 \ SUN
+0x2223 CONSTANT DW_AT_SUN_hwcprof_signature             \ SUN
+0x2224 CONSTANT DW_AT_SUN_amd64_parmdump                \ SUN
+0x2225 CONSTANT DW_AT_SUN_part_link_name                \ SUN
+0x2226 CONSTANT DW_AT_SUN_link_name                     \ SUN
+0x2227 CONSTANT DW_AT_SUN_pass_with_const               \ SUN
+0x2228 CONSTANT DW_AT_SUN_return_with_const             \ SUN
+0x2229 CONSTANT DW_AT_SUN_import_by_name                \ SUN
+0x222A CONSTANT DW_AT_SUN_f90_pointer                   \ SUN
+0x222B CONSTANT DW_AT_SUN_pass_by_ref                   \ SUN
+0x222C CONSTANT DW_AT_SUN_f90_allocatable               \ SUN
+0x222D CONSTANT DW_AT_SUN_f90_assumed_shape_array       \ SUN
+0x222E CONSTANT DW_AT_SUN_c_vla                         \ SUN
+0x2230 CONSTANT DW_AT_SUN_return_value_ptr              \ SUN
+0x2231 CONSTANT DW_AT_SUN_dtor_start                    \ SUN
+0x2232 CONSTANT DW_AT_SUN_dtor_length                   \ SUN
+0x2233 CONSTANT DW_AT_SUN_dtor_state_initial            \ SUN
+0x2234 CONSTANT DW_AT_SUN_dtor_state_final              \ SUN
+0x2235 CONSTANT DW_AT_SUN_dtor_state_deltas             \ SUN
+0x2236 CONSTANT DW_AT_SUN_import_by_lname               \ SUN
+0x2237 CONSTANT DW_AT_SUN_f90_use_only                  \ SUN
+0x2238 CONSTANT DW_AT_SUN_namelist_spec                 \ SUN
+0x2239 CONSTANT DW_AT_SUN_is_omp_child_func             \ SUN
+0x223A CONSTANT DW_AT_SUN_fortran_main_alias            \ SUN
+0x223B CONSTANT DW_AT_SUN_fortran_based                 \ SUN
+
+\   See http://gcc.gnu.org/wiki/DW_AT_GNAT_descriptive_type .
+0x2301 CONSTANT DW_AT_use_GNAT_descriptive_type         \ GNAT
+0x2302 CONSTANT DW_AT_GNAT_descriptive_type             \ GNAT
+
+\ UPC extension
+0x3210 CONSTANT DW_AT_upc_threads_scaled                \ UPC
+
+\ PGI (STMicroelectronics) extensions.
+0x3A00 CONSTANT DW_AT_PGI_lbase                         \ PGI. Block, constant, reference. This attribute is an ASTPLAB extension used to describe the array local base.
+0x3A01 CONSTANT DW_AT_PGI_soffset                        \ PGI. Block, constant, reference. ASTPLAB adds this attribute to describe the section offset, or the offset to the first element in the dimension.
+0x3A02 CONSTANT DW_AT_PGI_lstride                        \ PGI. Block, constant, reference. ASTPLAB adds this attribute to describe the linear stride or the distance between elements in the dimension.
+
+\ There are two groups of Apple extensions here, it is
+\   unclear what exactly is correct.
+0x3FE1 CONSTANT DW_AT_APPLE_optimized                   \ Apple
+0x3FE2 CONSTANT DW_AT_APPLE_flags                       \ Apple
+0x3FE3 CONSTANT DW_AT_APPLE_isa                         \ Apple
+0x3FE4 CONSTANT DW_AT_APPLE_block                       \ Apple
+0x3FE5 CONSTANT DW_AT_APPLE_major_runtime_vers          \ Apple
+0x3FE6 CONSTANT DW_AT_APPLE_runtime_class               \ Apple
+0x3FE7 CONSTANT DW_AT_APPLE_omit_frame_ptr              \ Apple
+
+\ Apple Extensions for closures
+0x3FE4 CONSTANT DW_AT_APPLE_closure                     \ Apple
+
+0x3FFF CONSTANT DW_AT_hi_user
+
+
+
+0x03 CONSTANT DW_OP_addr
+0x06 CONSTANT DW_OP_deref
+0x08 CONSTANT DW_OP_const1u
+0x09 CONSTANT DW_OP_const1s
+0x0A CONSTANT DW_OP_const2u
+0x0B CONSTANT DW_OP_const2s
+0x0C CONSTANT DW_OP_const4u
+0x0D CONSTANT DW_OP_const4s
+0x0E CONSTANT DW_OP_const8u
+0x0F CONSTANT DW_OP_const8s
+0x10 CONSTANT DW_OP_constu
+0x11 CONSTANT DW_OP_consts
+0x12 CONSTANT DW_OP_dup
+0x13 CONSTANT DW_OP_drop
+0x14 CONSTANT DW_OP_over
+0x15 CONSTANT DW_OP_pick
+0x16 CONSTANT DW_OP_swap
+0x17 CONSTANT DW_OP_rot
+0x18 CONSTANT DW_OP_xderef
+0x19 CONSTANT DW_OP_abs
+0x1A CONSTANT DW_OP_and
+0x1B CONSTANT DW_OP_div
+0x1C CONSTANT DW_OP_minus
+0x1D CONSTANT DW_OP_mod
+0x1E CONSTANT DW_OP_mul
+0x1F CONSTANT DW_OP_neg
+0x20 CONSTANT DW_OP_not
+0x21 CONSTANT DW_OP_or
+0x22 CONSTANT DW_OP_plus
+0x23 CONSTANT DW_OP_plus_uconst
+0x24 CONSTANT DW_OP_shl
+0x25 CONSTANT DW_OP_shr
+0x26 CONSTANT DW_OP_shra
+0x27 CONSTANT DW_OP_xor
+0x28 CONSTANT DW_OP_bra
+0x29 CONSTANT DW_OP_eq
+0x2A CONSTANT DW_OP_ge
+0x2B CONSTANT DW_OP_gt
+0x2C CONSTANT DW_OP_le
+0x2D CONSTANT DW_OP_lt
+0x2E CONSTANT DW_OP_ne
+0x2F CONSTANT DW_OP_skip
+0x30 CONSTANT DW_OP_lit0
+0x31 CONSTANT DW_OP_lit1
+0x32 CONSTANT DW_OP_lit2
+0x33 CONSTANT DW_OP_lit3
+0x34 CONSTANT DW_OP_lit4
+0x35 CONSTANT DW_OP_lit5
+0x36 CONSTANT DW_OP_lit6
+0x37 CONSTANT DW_OP_lit7
+0x38 CONSTANT DW_OP_lit8
+0x39 CONSTANT DW_OP_lit9
+0x3A CONSTANT DW_OP_lit10
+0x3B CONSTANT DW_OP_lit11
+0x3C CONSTANT DW_OP_lit12
+0x3D CONSTANT DW_OP_lit13
+0x3E CONSTANT DW_OP_lit14
+0x3F CONSTANT DW_OP_lit15
+0x40 CONSTANT DW_OP_lit16
+0x41 CONSTANT DW_OP_lit17
+0x42 CONSTANT DW_OP_lit18
+0x43 CONSTANT DW_OP_lit19
+0x44 CONSTANT DW_OP_lit20
+0x45 CONSTANT DW_OP_lit21
+0x46 CONSTANT DW_OP_lit22
+0x47 CONSTANT DW_OP_lit23
+0x48 CONSTANT DW_OP_lit24
+0x49 CONSTANT DW_OP_lit25
+0x4A CONSTANT DW_OP_lit26
+0x4B CONSTANT DW_OP_lit27
+0x4C CONSTANT DW_OP_lit28
+0x4D CONSTANT DW_OP_lit29
+0x4E CONSTANT DW_OP_lit30
+0x4F CONSTANT DW_OP_lit31
+0x50 CONSTANT DW_OP_reg0
+0x51 CONSTANT DW_OP_reg1
+0x52 CONSTANT DW_OP_reg2
+0x53 CONSTANT DW_OP_reg3
+0x54 CONSTANT DW_OP_reg4
+0x55 CONSTANT DW_OP_reg5
+0x56 CONSTANT DW_OP_reg6
+0x57 CONSTANT DW_OP_reg7
+0x58 CONSTANT DW_OP_reg8
+0x59 CONSTANT DW_OP_reg9
+0x5A CONSTANT DW_OP_reg10
+0x5B CONSTANT DW_OP_reg11
+0x5C CONSTANT DW_OP_reg12
+0x5D CONSTANT DW_OP_reg13
+0x5E CONSTANT DW_OP_reg14
+0x5F CONSTANT DW_OP_reg15
+0x60 CONSTANT DW_OP_reg16
+0x61 CONSTANT DW_OP_reg17
+0x62 CONSTANT DW_OP_reg18
+0x63 CONSTANT DW_OP_reg19
+0x64 CONSTANT DW_OP_reg20
+0x65 CONSTANT DW_OP_reg21
+0x66 CONSTANT DW_OP_reg22
+0x67 CONSTANT DW_OP_reg23
+0x68 CONSTANT DW_OP_reg24
+0x69 CONSTANT DW_OP_reg25
+0x6A CONSTANT DW_OP_reg26
+0x6B CONSTANT DW_OP_reg27
+0x6C CONSTANT DW_OP_reg28
+0x6D CONSTANT DW_OP_reg29
+0x6E CONSTANT DW_OP_reg30
+0x6F CONSTANT DW_OP_reg31
+0x70 CONSTANT DW_OP_breg0
+0x71 CONSTANT DW_OP_breg1
+0x72 CONSTANT DW_OP_breg2
+0x73 CONSTANT DW_OP_breg3
+0x74 CONSTANT DW_OP_breg4
+0x75 CONSTANT DW_OP_breg5
+0x76 CONSTANT DW_OP_breg6
+0x77 CONSTANT DW_OP_breg7
+0x78 CONSTANT DW_OP_breg8
+0x79 CONSTANT DW_OP_breg9
+0x7A CONSTANT DW_OP_breg10
+0x7B CONSTANT DW_OP_breg11
+0x7C CONSTANT DW_OP_breg12
+0x7D CONSTANT DW_OP_breg13
+0x7E CONSTANT DW_OP_breg14
+0x7F CONSTANT DW_OP_breg15
+0x80 CONSTANT DW_OP_breg16
+0x81 CONSTANT DW_OP_breg17
+0x82 CONSTANT DW_OP_breg18
+0x83 CONSTANT DW_OP_breg19
+0x84 CONSTANT DW_OP_breg20
+0x85 CONSTANT DW_OP_breg21
+0x86 CONSTANT DW_OP_breg22
+0x87 CONSTANT DW_OP_breg23
+0x88 CONSTANT DW_OP_breg24
+0x89 CONSTANT DW_OP_breg25
+0x8A CONSTANT DW_OP_breg26
+0x8B CONSTANT DW_OP_breg27
+0x8C CONSTANT DW_OP_breg28
+0x8D CONSTANT DW_OP_breg29
+0x8E CONSTANT DW_OP_breg30
+0x8F CONSTANT DW_OP_breg31
+0x90 CONSTANT DW_OP_regx
+0x91 CONSTANT DW_OP_fbreg
+0x92 CONSTANT DW_OP_bregx
+0x93 CONSTANT DW_OP_piece
+0x94 CONSTANT DW_OP_deref_size
+0x95 CONSTANT DW_OP_xderef_size
+0x96 CONSTANT DW_OP_nop
+0x97 CONSTANT DW_OP_push_object_address        \ DWARF3
+0x98 CONSTANT DW_OP_call2                      \ DWARF3
+0x99 CONSTANT DW_OP_call4                      \ DWARF3
+0x9A CONSTANT DW_OP_call_ref                   \ DWARF3
+0x9B CONSTANT DW_OP_form_tls_address           \ DWARF3f
+0x9C CONSTANT DW_OP_call_frame_cfa             \ DWARF3f
+0x9D CONSTANT DW_OP_bit_piece                  \ DWARF3f
+0x9E CONSTANT DW_OP_implicit_value             \ DWARF4
+0x9F CONSTANT DW_OP_stack_value                \ DWARF4
+
+
+    \ GNU extensions.
+0xE0 CONSTANT DW_OP_GNU_push_tls_address      \ GNU
+
+\ FOllows extension so dwarfdump prints the most-likely-useful name.
+0xE0 CONSTANT DW_OP_lo_user
+
+
+0xF0 CONSTANT DW_OP_GNU_uninit                \ GNU
+0xF1 CONSTANT DW_OP_GNU_encoded_addr          \ GNU
+0xF2 CONSTANT DW_OP_GNU_implicit_pointer      \ GNU
+0xF3 CONSTANT DW_OP_GNU_entry_value           \ GNU
+
+    \ HP extensions.
+0xE0 CONSTANT DW_OP_HP_unknown                \ HP conflict: GNU
+0xE1 CONSTANT DW_OP_HP_is_value               \ HP
+0xE2 CONSTANT DW_OP_HP_fltconst4              \ HP
+0xE3 CONSTANT DW_OP_HP_fltconst8              \ HP
+0xE4 CONSTANT DW_OP_HP_mod_range              \ HP
+0xE5 CONSTANT DW_OP_HP_unmod_range            \ HP
+0xE6 CONSTANT DW_OP_HP_tls                    \ HP
+
+0xE8 CONSTANT DW_OP_INTEL_bit_piece           \ Intel: made obsolete by DW_OP_bit_piece above.
+
+   \ Apple extension.
+0xF0 CONSTANT DW_OP_APPLE_uninit              \ Apple
+0xF8 CONSTANT DW_OP_PGI_omp_thread_num        \ PGI (STMicroelectronics)
+
+0xFF CONSTANT DW_OP_hi_user
+
+0x1  CONSTANT DW_ATE_address
+0x2  CONSTANT DW_ATE_boolean
+0x3  CONSTANT DW_ATE_complex_float
+0x4  CONSTANT DW_ATE_float
+0x5  CONSTANT DW_ATE_signed
+0x6  CONSTANT DW_ATE_signed_char
+0x7  CONSTANT DW_ATE_unsigned
+0x8  CONSTANT DW_ATE_unsigned_char
+0x9  CONSTANT DW_ATE_imaginary_float          \ DWARF3
+0xA  CONSTANT DW_ATE_packed_decimal           \ DWARF3f
+0xB  CONSTANT DW_ATE_numeric_string           \ DWARF3f
+0xC  CONSTANT DW_ATE_edited                   \ DWARF3f
+0xD  CONSTANT DW_ATE_signed_fixed             \ DWARF3f
+0xE  CONSTANT DW_ATE_unsigned_fixed           \ DWARF3f
+0xF  CONSTANT DW_ATE_decimal_float            \ DWARF3f
+
+
+\ ALTIUM extensions. x80, x81
+0x80 CONSTANT DW_ATE_ALTIUM_fract            \ ALTIUM __fract type
+
+\ Follows extension so dwarfdump prints the most-likely-useful name.
+0x80 CONSTANT DW_ATE_lo_user
+
+\ Shown here to help dwarfdump build script.
+0x81 CONSTANT DW_ATE_ALTIUM_accum            \ ALTIUM __accum type
+
+\ HP Floating point extensions.
+0x80 CONSTANT DW_ATE_HP_float80             \ (80 bit). HP
+0x81 CONSTANT DW_ATE_HP_complex_float80     \ Complex (80 bit). HP
+0x82 CONSTANT DW_ATE_HP_float128            \ (128 bit). HP
+0x83 CONSTANT DW_ATE_HP_complex_float128    \ Complex (128 bit). HP
+0x84 CONSTANT DW_ATE_HP_floathpintel        \ (82 bit IA64). HP
+0x85 CONSTANT DW_ATE_HP_imaginary_float80   \ HP
+0x86 CONSTANT DW_ATE_HP_imaginary_float128  \ HP
+
+\ Sun extensions
+0x91 CONSTANT DW_ATE_SUN_interval_float
+0x92 CONSTANT DW_ATE_SUN_imaginary_float      \ Obsolete: See DW_ATE_imaginary_float
+
+0xFF CONSTANT DW_ATE_hi_user
+
+\ These are known values for DW_LNS_set_isa.
+0 CONSTANT DW_ISA_UNKNOWN
+\ The following two are ARM specific.
+1 CONSTANT DW_ISA_ARM_thumb  \ ARM ISA
+2 CONSTANT DW_ISA_ARM_arm    \ ARM ISA
+
+\ Frame info constants
+0x40 CONSTANT DW_CFA_advance_loc
+0x80 CONSTANT DW_CFA_offset
+0xC0 CONSTANT DW_CFA_restore
+0    CONSTANT DW_CFA_extended
+
+0x00 CONSTANT DW_CFA_nop
+0x01 CONSTANT DW_CFA_set_loc
+0x02 CONSTANT DW_CFA_advance_loc1
+0x03 CONSTANT DW_CFA_advance_loc2
+0x04 CONSTANT DW_CFA_advance_loc4
+0x05 CONSTANT DW_CFA_offset_extended
+0x06 CONSTANT DW_CFA_restore_extended
+0x07 CONSTANT DW_CFA_undefined
+0x08 CONSTANT DW_CFA_same_value
+0x09 CONSTANT DW_CFA_register
+0x0A CONSTANT DW_CFA_remember_state
+0x0B CONSTANT DW_CFA_restore_state
+0x0C CONSTANT DW_CFA_def_cfa
+0x0D CONSTANT DW_CFA_def_cfa_register
+0x0E CONSTANT DW_CFA_def_cfa_offset
+0x0F CONSTANT DW_CFA_def_cfa_expression      \ DWARF3
+0x10 CONSTANT DW_CFA_expression              \ DWARF3
+0x11 CONSTANT DW_CFA_offset_extended_sf      \ DWARF3
+0x12 CONSTANT DW_CFA_def_cfa_sf              \ DWARF3
+0x13 CONSTANT DW_CFA_def_cfa_offset_sf       \ DWARF3
+0x14 CONSTANT DW_CFA_val_offset              \ DWARF3f
+0x15 CONSTANT DW_CFA_val_offset_sf           \ DWARF3f
+0x16 CONSTANT DW_CFA_val_expression          \ DWARF3f
+
+0x1C CONSTANT DW_CFA_lo_user
+0x1C CONSTANT DW_CFA_low_user             \ Incorrect spelling, do not use.
+
+BASE !
+

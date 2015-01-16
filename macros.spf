@@ -1,0 +1,89 @@
+\ ======================================= assembler macros ==========================================
+INTERPRETER
+
+: pops  \ pop register list from data stack
+    [ASM]
+        fsp !! ldmia
+    [END-ASM]
+;
+
+: popt  \ pop tos from data stack
+    [ASM]
+        { tos } pops
+    [END-ASM]
+;
+
+: poptmp \ pop tmp from data stack
+    [ASM]
+        { tmp } pops
+    [END-ASM]
+;
+
+: pushs \ push register list to data stack ( must contain 2 or more registers )
+    [ASM]
+        fsp !! stmdb
+    [END-ASM]
+;
+
+: pushreg \ push register to data stack
+    [ASM]
+        [ 4 # fsp -]! RSWAP str
+    [END-ASM]
+;
+
+: pusht \ push tos to data stack
+    [ASM]
+        tos pushreg
+    [END-ASM]
+;
+
+: pushtmp \ push tmp to data stack
+    [ASM]
+        tmp pushreg
+    [END-ASM]
+;
+
+: ret
+    [ASM]
+        lr bx
+    [END-ASM]
+;
+
+: next,
+    [ASM]
+        { pc } pop
+    [END-ASM]
+;
+
+
+
+: #mov ( x -- ) \ x loreg #mov
+\ move constant to lo register, optimized
+    [ASM]
+    DUP 0 0x100 WITHIN IF \ 2-byte movs instruction
+        # movs
+    ELSE
+        DUP ?CONST IF
+            # mov \ 4-byte constant mov instruction
+        ELSE
+            DUP 0< OVER INVERT ?CONST AND IF
+                INVERT # mvn \ 4-byte inverted constant mov instruction
+            ELSE
+                SPLIT SWAP ( hi lo ) \ optimize with 1 or 2 instructions
+                RPOP DUP RPUSH -ROT ( reg hi lo ) \ get destination register
+                \ mov low word
+                DUP 0 0x100 WITHIN IF
+                    # movs
+                ELSE
+                    # movw
+                THEN
+                \ mov high word if not zero
+                ?DUP IF
+                    SWAP RPUSH # movt
+                ELSE DROP THEN
+            THEN
+        THEN
+    THEN
+    [END-ASM]
+ ;
+

@@ -1,0 +1,32 @@
+\ LM3S316 for emulating with proteus
+\ 16k Flash
+\  4k RAM
+
+HOST proteus_device CONSTANT DEVICE
+
+\ define memory layout
+
+INTERPRETER HEX
+00000000 00003FFF CDATA SECTION FLASH
+20000000 200000FF IDATA SECTION IRAM
+20000100 20000EFF UDATA SECTION URAM
+FLASH IRAM URAM
+
+\ init debug info
+TARGET CDATA CURRENT-SECTION-START HOST DUP TADDR>ADDR FILENAME COUNT DWARF_INIT
+
+\ where to put the stacks?
+TARGET
+20001000  EQU RSTACK-BOTTOM
+20000F00  EQU STACK-BOTTOM
+HOST 20000000 FF +  TO  'RAMBASE
+
+\ cortex-m3 common interrupts
+HOST S" devices/int_cm3.spf" INCLUDED
+\ Device interrupts
+HOST S" devices/int_lm3s.spf" INCLUDED
+\ and registers
+HOST S" devices/reg_lm3s.spf" INCLUDED
+\ cortex-m3 common registers
+HOST S" devices/reg_cm3.spf" INCLUDED
+

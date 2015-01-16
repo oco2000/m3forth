@@ -1,0 +1,31 @@
+\ command line options
+
+\ create one option switch
+: OPTION ( value_cfa default -- )
+    CREATE , ,
+    DOES> 2@ SWAP BEHAVIOR! \ store default to value
+;
+
+\ create option value and switches
+: OPTION: ( default -- )
+    VALUE   \ create value with option
+    LATEST NAME> DUP
+    TRUE  OPTION
+    FALSE OPTION
+;
+
+\ options table
+\  default        value          on_option  off_option
+    FALSE OPTION: O_INTERPRETER     -I      -i      \ include target interpreter
+    TRUE  OPTION: O_HEADERS         -H      -h      \ generate headers for kernel
+    TRUE  OPTION: O_OPTIMIZE        -O      -o      \ optimize
+    FALSE OPTION: O_DEBUG           -D      -d      \ display debug messages
+    FALSE OPTION: O_MAP             -M      -m      \ display memory map
+    FALSE OPTION: O_CONSTANTS       -C      -c      \ include constants (registers) into target image
+    TRUE  OPTION: O_ELF             -E      -e      \ create elf file
+    FALSE OPTION: O_HEX             -HEX    -hex    \ create hex file
+    TRUE  OPTION: O_BITBANDING      -B      -b      \ use bit-banding when optimizing
+
+: +OPT  -O ;
+: -OPT  -o ;
+

@@ -1,0 +1,540 @@
+\
+\  Forth kernel
+\
+
+\ ===================================== forth macros ======================================
+COMPILER
+: DROP
+    popt
+;
+
+: DUP
+    pusht
+;
+
+: NIP
+    [ASM]
+        4 # fsp adds
+    [END-ASM]
+;
+
+: 2DROP
+    [ASM]
+        { tmp tos } pops
+    [END-ASM]
+;
+
+: 2DUP    ( x1 tos -- x1 tos x1 tos )
+    [ASM]
+        [ 0 # fsp ] tmp ldr
+        { tmp tos } pushs
+    [END-ASM]
+;
+
+: OVER
+    [ASM]
+        pusht
+        [ 4 # fsp ] tos ldr
+    [END-ASM]
+;
+
+: SWAP
+    [ASM]
+        poptmp
+        pusht
+        tmp tos movs
+    [END-ASM]
+;
+
+: PICK
+    [ASM]
+        2 # tos tos lsls
+        [ tos fsp ] tos ldr
+    [END-ASM]
+;
+
+
+: >R
+    [ASM]
+        { tos } push
+        popt
+    [END-ASM]
+;
+
+: DUP>R
+    [ASM]
+        { tos } push
+    [END-ASM]
+;
+
+: OVER>R
+    [ASM]
+        [ fsp ] tmp ldr
+        { tmp } push
+    [END-ASM]
+;
+
+: R>
+    [ASM]
+        pusht
+        { tos } pop
+    [END-ASM]
+;
+
+: R@
+    [ASM]
+        pusht
+        [ sp ] tos ldr
+    [END-ASM]
+;
+
+: RDROP
+    [ASM]
+        4 # sp sp add
+    [END-ASM]
+;
+
+: 2RDROP
+    [ASM]
+        8 # sp sp add
+    [END-ASM]
+;
+
+: 0!
+    [ASM]
+        0 tmp #mov
+        [ tos ] tmp str
+        popt
+    [END-ASM]
+;
+
+: @
+    [ASM]
+        [ tos ] tos ldr
+    [END-ASM]
+;
+
+: C@
+    [ASM]
+        [ tos ] tos ldrb
+    [END-ASM]
+;
+
+: H@
+    [ASM]
+        [ tos ] tos ldrh
+    [END-ASM]
+;
+
+: AND
+    [ASM]
+        poptmp
+        tmp tos ands
+    [END-ASM]
+;
+
+: OR
+    [ASM]
+        poptmp
+        tmp tos orrs
+    [END-ASM]
+;
+
+: XOR
+    [ASM]
+        poptmp
+        tmp tos eors
+    [END-ASM]
+;
+
+: INVERT
+    [ASM]
+        tos tos mvns
+    [END-ASM]
+;
+
+: BIT ( bit# -- mask )
+    [ASM]
+        1 tmp #mov
+        tos tmp tos lsls
+    [END-ASM]
+;
+
+: LSHIFT
+    [ASM]
+        poptmp
+        tos tmp tos lsls
+    [END-ASM]
+;
+
+: RSHIFT
+    [ASM]
+        poptmp
+        tos tmp tos lsrs
+    [END-ASM]
+;
+
+: 2*
+    [ASM]
+        tos tos add
+    [END-ASM]
+;
+
+: 2/
+    [ASM]
+        1 # tos tos asrs
+    [END-ASM]
+;
+
+: CELLS
+    [ASM]
+        2 # tos tos lsls
+    [END-ASM]
+;
+
+: CHARS ;
+
+: +
+    [ASM]
+        poptmp
+        tmp tos add
+    [END-ASM]
+;
+
+: CHAR+
+    [ASM]
+        1 # tos adds
+    [END-ASM]
+;
+
+: CHAR-
+    [ASM]
+        1 # tos subs
+    [END-ASM]
+;
+
+: 1+
+    [ASM]
+        1 # tos adds
+    [END-ASM]
+;
+
+: 2+
+    [ASM]
+        2 # tos adds
+    [END-ASM]
+;
+
+: 1-
+    [ASM]
+        1 # tos subs
+    [END-ASM]
+;
+
+: 2-
+    [ASM]
+        2 # tos subs
+    [END-ASM]
+;
+
+: CELL+
+    [ASM]
+        4 # tos adds
+    [END-ASM]
+;
+
+: -
+    [ASM]
+        poptmp
+        tos tmp tos subs
+    [END-ASM]
+;
+
+: NEGATE
+    [ASM]
+        tos tos rsbs
+    [END-ASM]
+;
+
+: ABS
+    [ASM]
+        tos tos orrs
+        mi it
+            tos tos rsbs
+    [END-ASM]
+;
+
+: 0<
+    [ASM]
+        31 # tos tos asrs
+    [END-ASM]
+;
+
+: S>D
+    [ASM]
+        pusht
+        31 # tos tos asrs
+    [END-ASM]
+;
+
+: D>S
+    [ASM]
+        popt
+    [END-ASM]
+;
+
+: *
+    [ASM]
+        poptmp
+        tmp tos muls
+    [END-ASM]
+;
+
+\ symmetric
+\ ~ : /
+    \ ~ [ASM]
+        \ ~ poptmp
+        \ ~ tos tmp tos sdiv
+    \ ~ [END-ASM]
+\ ~ ;
+
+
+: UNLOOP
+    [ASM]
+        8 # sp sp add
+    [END-ASM]
+;
+
+: EXIT
+    next,
+;
+
+: !SP
+    [ASM]
+        STACK-BOTTOM fsp #mov
+    [END-ASM]
+;
+
+: !RP
+    [ASM]
+        RSTACK-BOTTOM tmp #mov
+        tmp sp mov
+    [END-ASM]
+;
+
+: SP!
+    [ASM]
+        tos          fsp mov
+        popt
+    [END-ASM]
+;
+
+: SP@
+    [ASM]
+        pusht
+        fsp          tos mov
+    [END-ASM]
+;
+
+: RP!
+    [ASM]
+        tos          sp mov
+        popt
+    [END-ASM]
+;
+
+S" opt_rules.spf" INCLUDED
+
+COMPILER
+
+: TO ( x "name" -- )
+    ALSO INTERPRETING (TO) PREVIOUS \ get t-addr from shadow word
+    POSTPONE LITERAL
+    C" !" TARGET-COMPILE
+;
+
+: IS ( xt "name" -- ) \ same as 1+ TO
+    C" 1+" TARGET-COMPILE \ correct thumb2 address
+    POSTPONE TO
+;
+
+\ ============================================ kernel words ======================================
+\ constants
+TARGET DECIMAL
+0  CONSTANT FALSE
+-1 CONSTANT TRUE
+4  CONSTANT CELL
+
+DEFER EMIT
+DEFER TYPE
+
+HOST O_INTERPRETER TARGET [IF]
+    DEFER KEY
+    DEFER KEY?
+    DEFER ABORT
+[THEN]
+
+\ variables
+IDATA
+VARIABLE LATEST
+VARIABLE DP
+
+UDATA
+VARIABLE >OUT
+
+\ During compilation, the cross compiler will use it's own variables to keep
+\ track of the dictionary.  In the target system, we need copies of the last
+\ values of these variables, to access the dictionary.  The following hook
+\ updates the target dictionary (idata) variables whenever the cross compiler
+\ adds data or new definitions to the dictionary.
+INTERPRETER
+: (MODIFIED-THERE)
+   SAVE-SECTIONS
+   UDATA THERE DP !
+   [ HOST ] LINK @ [ INTERPRETER ] LATEST !
+   RESTORE-SECTIONS ;
+' (MODIFIED-THERE) TO MODIFIED-THERE
+
+TARGET
+
+: TUCK  ( x1 x2 -- x2 x1 x2 )   SWAP OVER ;
+: DEPTH  ( -- n )  STACK-BOTTOM SP@ -  2/ 2/  2 - ;
+
+\ multi-tasking support
+\ USER 'tos
+\ USER next-task
+
+\ : pause  rp@  sp@  'tos !  next-task @ >r ;
+\ : wake  r> tp!  'tos @ sp! rp! ;
+
+\ double
+: D0= ( d -- flag)   OR 0= ;
+: D0< ( d -- flag)   NIP 0< ;
+: D= ( d1 d2 -- flag)   D- D0= ;
+: DABS ( d1 -- d2)   DUP 0< IF  DNEGATE  THEN ;
+: M+ ( d1 n -- d2)   S>D D+ ;
+
+: DMIN ( d1 d2 -- d3)   2OVER 2OVER D< INVERT IF  2SWAP  THEN 2DROP ;
+: DMAX ( d1 d2 -- d3)   2OVER 2OVER D< IF  2SWAP  THEN 2DROP ;
+
+\ math
+: FM/MOD  ( d1 n1 -- n2 n3 )
+    DUP >R DUP 0< IF  NEGATE >R DNEGATE R>  THEN
+    OVER       0< IF  TUCK + SWAP  THEN
+    UM/MOD
+    R> 0< IF  SWAP NEGATE SWAP  THEN ;
+
+: SM/REM  ( d1 n1 -- n2 n3 )
+    OVER >R DUP >R ABS -ROT
+    DABS ROT UM/MOD
+    R> R@ XOR 0< IF       NEGATE       THEN
+    R>        0< IF  SWAP NEGATE SWAP  THEN ;
+
+: */MOD ( n1 n2 n3 -- n4 n5)
+   >R M* R> FM/MOD
+;
+
+: */ ( n1 n2 n3 -- n4)   */MOD NIP ;
+
+: /MOD ( n1 n2 -- n3 n4)
+    >R S>D R> FM/MOD ;
+
+: MOD ( n1 n2 -- n3)   /MOD DROP ;
+
+: / ( n1 n2 -- n3)   /MOD NIP ;
+
+\ string and memory routines
+: ALIGNED  3 + 3 ANDC ;
+: HALIGNED  1+  1 ANDC ;
+: BOUNDS  ( c-addr1 u1 -- c-addr2 c-addr1 ) OVER + SWAP ;
+: /STRING  ( c-addr1 u1 n -- c-addr2 u2 )  ROT OVER +  -ROT - ;
+: ERASE  ( c-addr1 u -- )  0 FILL ;
+[IFUNDEF] COMPARE
+    : COMPARE  ( c-addr1 u1 c-addr2 u2 -- +1|0|-1 )
+       BOUNDS ?DO
+          DUP 0= IF  2DROP  TRUE UNLOOP EXIT THEN
+          OVER C@  I C@  -  DUP IF  0< 1 OR  NIP NIP  UNLOOP EXIT THEN  DROP
+          1 /STRING
+       LOOP
+       NIP  0<> 1 AND
+    ;
+[THEN]
+: MOVE ( addr1 addr2 u -- )
+  >R 2DUP SWAP R@ + U<
+  IF 2DUP U<
+     IF R> CMOVE> ELSE R> CMOVE THEN
+  ELSE R> CMOVE THEN
+;
+
+: @SLIT  ( -- c-addr u )
+   R>
+   R> 1- ( thumb2 correction ) COUNT  2DUP + HALIGNED 1+ ( thumb2 correction ) >R
+   ROT >R ;
+: (S")  @SLIT ;   ' (S") HOST TO '(S")  TARGET
+
+\ terminal output
+32 CONSTANT BL
+
+: (TYPE_WITH_EMIT)  ( c-addr u -- )
+   BOUNDS ?DO  I C@ EMIT LOOP ;
+' (TYPE_WITH_EMIT) IS TYPE
+
+CVARIABLE (CHAR)
+: (EMIT_WITH_TYPE) ( c -- )
+    (CHAR) C! (CHAR) 1 TYPE ;
+
+: SPACE  ( -- )  BL EMIT ;
+: CR  13 EMIT 10 EMIT 0 >OUT ! ;
+: .ESC  27 EMIT ;
+: SPACES   ( U -- )  0 MAX  0 ?DO SPACE LOOP ;
+: (.")  @SLIT TYPE ;  ' (.") HOST TO '(.")  TARGET
+: PAGE  .ESC ." [2J"  .ESC ." [1;1H" ;
+
+\ dictionary
+HEX
+: HERE  DP @ ;
+: PAD  HERE 60 + ;
+: ALLOT   DP +! ;
+: ,  HERE !  CELL ALLOT ;
+: H,  HERE H!  2 ALLOT ;
+: C,  HERE C!  1 ALLOT ;
+: ALIGN  HERE ALIGNED DP ! ;
+: HALIGN   HERE HALIGNED DP ! ;
+
+\ number output conversion
+DECIMAL
+VARIABLE BASE
+VARIABLE HLD
+
+: DECIMAL  10 BASE ! ;
+: HEX  16 BASE ! ;
+: <#  ( -- )  PAD  HLD ! ;
+: HOLD  ( char -- )  TRUE HLD +!  HLD @ C! ;
+: SIGN  ( d1 -- ud2 )  0< IF  [CHAR] - HOLD THEN ;
+: DIGIT ( u -- char)   DUP 9 > IF  7 +  THEN  [CHAR] 0 + ;
+
+: # ( ud1 -- ud2)   DUP IF  0 BASE @ UM/MOD  ROT ROT
+      BASE @ UM/MOD  SWAP DIGIT HOLD  SWAP  ELSE
+   BASE @ UM/MOD  SWAP DIGIT HOLD  0  THEN ;
+
+: #S ( ud1 -- ud2)   BEGIN  #  2DUP OR 0= UNTIL ;
+: #> ( ud -- c-addr u )   2DROP  HLD @ PAD OVER - ;
+
+: (UD.) ( ud - c-addr u )   <#  #S  #> ;
+: (D.)  ( d - c-addr u )   TUCK DABS <#  #S ROT SIGN #> ;
+
+: (U.) ( u -- c-addr u )   0 (UD.) ;
+
+: D. ( d -- )   (D.) TYPE SPACE ;
+: D.R ( d n -- )   -ROT (D.)  ROT OVER - SPACES TYPE ;
+
+: UD. ( ud -- )   (UD.) TYPE SPACE ;
+: UD.R ( ud n -- )   -ROT (UD.)  ROT OVER - SPACES TYPE ;
+
+: . ( n -- )   S>D D. ;
+: .R ( n n -- )   SWAP S>D ROT D.R ;
+
+: U. ( u -- )  0 D. ;
+: U.R ( u n -- )   0 SWAP UD.R ;
+
+HOST

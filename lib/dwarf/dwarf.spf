@@ -1,0 +1,687 @@
+MODULE: DWARF \ DWARF debugging info and ELF file creating
+
+O_ELF [IF]
+
+: bit  1 SWAP LSHIFT ; \ bitmask
+
+\ current file, line, column
+: fullpath ( a1 u1 -- a2 u2 ) \ get full path of file
+    >ASCIIZ 1 <( 0 )) realpath ASCIIZ>
+;
+
+: curpath ( -- a u ) \ get full path of current file
+    (( CURFILE @ 0 )) realpath ASCIIZ>
+;
+
+: curfile ( -- a u ) \ get current file without path
+    curpath \ DROP 1 <( )) basename ASCIIZ>
+;
+
+: curdir ( -- a u ) \ get path to current file
+    curpath DROP 1 <( )) dirname ASCIIZ>
+;
+
+S" lib/dwarf/libelf.spf" INCLUDED
+S" lib/dwarf/libdwarf.spf" INCLUDED
+
+S" lib/dwarf/strtab.spf" INCLUDED     \ string tables
+S" lib/dwarf/filetab.spf" INCLUDED    \ table for storing filenames with indices
+
+\ variables
+0 VALUE FD      \ elf file descriptor
+0 VALUE FSIZE   \ elf .text section size
+0 VALUE .TEXT   \ address of binary data
+
+0 VALUE E       \ Elf descriptor
+0 VALUE scn     \ current elf section
+0 VALUE data    \ current elf section data
+0 VALUE ehdr    \ elf header
+0 VALUE phdr    \ program header
+0 VALUE ehdrsz  \ size of elf header
+0 VALUE phdrsz  \ size of program header
+0 VALUE shdr    \ current section header
+0 VALUE text_section_index  \ index of .text section
+0 VALUE symtab_header \ header of .symtab section
+
+0 VALUE LOADADDR \ address to load the code
+
+STRING_TABLE shstrtab   \ table with section names
+1 VALUE text_name_index \ index of section .text name
+S" .text" shstrtab ADD_STRING
+
+shstrtab STH_LENGTH VALUE shstrtab_name_index \ index of section .shstrtab name
+S" .shstrtab" shstrtab ADD_STRING
+
+STRING_TABLE strtab \ table with symbol names
+
+: ELF_ERROR ( f a u -- ) \ type text and elf message if error
+    ROT IF
+        ." ERROR! " TYPE SPACE
+        (( -1 )) elf_errmsg ASCIIZ> TYPE CR
+        BYE
+    ELSE 2DROP THEN
+;
+
+: create_header ( -- ) \ create elf header
+    (( E )) elf32_newehdr DUP TO ehdr 0= S" elf32_newehdr:" ELF_ERROR
+    ELFDATA2LSB ehdr e_ident EI_DATA + C!
+    ELFCLASS32  ehdr e_ident EI_CLASS + C!
+    EM_ARM      ehdr e_machine W!
+    ET_EXEC     ehdr e_type W!
+    EV_CURRENT  ehdr e_version !
+    0x5000000   ehdr e_flags ! \ v5 eabi
+
+    (( ELF_T_EHDR 1 EV_CURRENT )) elf32_fsize TO ehdrsz
+    (( ELF_T_PHDR 1 EV_CURRENT )) elf32_fsize TO phdrsz
+;
+
+: new_section ( -- section ) \ create new elf section
+    (( E )) elf_newscn DUP 0= S" new section:" ELF_ERROR
+;
+
+: new_data ( section -- data ) \ fill new section data with default values
+    1 <( )) elf_newdata DUP 0= S" new data:" ELF_ERROR
+    1 OVER           d_align !      \ align 1 byte
+    DUP 0. ROT       d_off 2!       \ 0 offset
+    ELF_T_BYTE OVER  d_type !       \ type - byte
+    EV_CURRENT OVER  d_version !    \ current version
+;
+
+: new_section_and_data ( -- ) \ create new elf section and fill new section data with default values
+    new_section DUP TO scn
+    new_data TO data
+;
+
+: get_section_header ( section -- header )
+    1 <( )) elf32_getshdr DUP 0= S" new header:" ELF_ERROR
+;
+
+: get_section ( index -- section ) \ get section by index
+    1 <( E SWAP )) elf_getscn
+;
+
+: update ( -- ) \ write elf data to disk
+    (( E 0 )) elf_update 0< S" update:" ELF_ERROR
+;
+
+0 VALUE text_data \ data of .text section
+
+: create_section_text ( -- ) \ create .text section
+    new_section_and_data
+    data TO text_data \ store new data to text_data
+    (( scn )) elf_ndxscn TO text_section_index \ get new section index and store it
+
+    .TEXT      data d_buf !
+    0          data d_size !
+
+    \ -------------------- section header --------------------------
+    scn get_section_header TO shdr
+    text_name_index             shdr sh_name !      \ Offset of ".text"
+    SHT_PROGBITS                shdr sh_type !
+    SHF_EXECINSTR SHF_ALLOC OR  shdr sh_flags !
+    LOADADDR                    shdr sh_addr !
+;
+
+: create_strtab ( -- ) \ create .strtab section
+    new_section_and_data
+
+    strtab sth_memory @  data d_buf !
+    strtab STH_LENGTH    data d_size !
+
+    \ ------------------------------------ section header for strtab ------------------------
+
+    scn get_section_header TO shdr
+    shstrtab STH_LENGTH shdr sh_name ! \ offset of ".strtab"
+    S" .strtab" shstrtab ADD_STRING
+    SHT_STRTAB          shdr sh_type !
+    SHF_STRINGS         shdr sh_flags !
+    (( scn )) elf_ndxscn symtab_header sh_link ! \ store section index to symtab link field !!!
+;
+
+
+STRING_TABLE .symtab \ table with debugging symbols
+0x10 CONSTANT /symbol
+CREATE temp_symbol /symbol ALLOT
+
+: add_symbol ( addr length a u info section_index -- ) \ add new debugging symbol
+\ addr - low address
+\ length - length of function
+\ a u - name of symbol
+
+    temp_symbol >R
+
+    R@                 st_shndx W!
+    R@                  st_info C!
+    strtab ADD_INDEX R@ st_name ! \ name index
+    R@                  st_size ! \ length
+    R@                 st_value ! \ address
+    0 R@               st_other C!
+
+    R> /symbol 1- .symtab ADD_STRING \ add symbol to table
+;
+
+: add_function_symbol ( addr length a u -- ) \ add new function debugging symbol
+\ a u - name of function
+    2>R SWAP 1+ SWAP 2R> \ add 1 to address to indicate thumb code
+    STB_GLOBAL STT_FUNC ELF32_ST_INFO
+    text_section_index
+    add_symbol
+;
+
+: add_file_symbol ( a u -- ) \ add file name
+    0 0 2SWAP
+    STB_LOCAL STT_FILE ELF32_ST_INFO
+    SHN_ABS
+    add_symbol
+;
+
+: create_symtab ( -- ) \ create .symtab section
+    new_section_and_data
+
+    0x4                     data d_align !
+    .symtab sth_memory @ 1+ data d_buf !
+    .symtab STH_LENGTH 1-   data d_size !
+
+    \ ------------------------------------ section header for symtab ------------------------
+
+    scn get_section_header TO shdr
+    shdr TO symtab_header
+    shstrtab STH_LENGTH shdr sh_name ! \ offset of ".symtab"
+    S" .symtab" shstrtab ADD_STRING
+
+    SHT_SYMTAB          shdr sh_type !
+    0                   shdr sh_flags !
+    0                   shdr sh_info !
+;
+
+\ ----------------------------------- string table with section names ---------------------------------------
+: create_shstrtab ( -- )
+    new_section_and_data
+
+    shstrtab sth_memory @ data d_buf !
+    shstrtab STH_LENGTH data d_size !
+
+    \ ------------------------------------ section header for strtab ------------------------
+    scn get_section_header TO shdr
+    shstrtab_name_index shdr sh_name !  \ offset of ".shstrtab"
+    SHT_STRTAB          shdr sh_type !
+    SHF_STRINGS         shdr sh_flags !
+    \  use this section for section names
+    (( scn )) elf_ndxscn ehdr e_shstrndx W!
+;
+
+: create_phdr ( -- ) \ create program header
+    (( E 1 )) elf32_newphdr DUP 0= S" new phdr:" ELF_ERROR TO phdr
+
+    PT_LOAD                     phdr p_type !
+    ehdrsz phdrsz + LOADADDR +  phdr p_offset !
+    \ ~ ehdrsz phdrsz + FSIZE + DUP phdr p_filesz ! \ fill this later
+                                \ ~ phdr p_memsz !
+    LOADADDR                    phdr p_vaddr !
+    LOADADDR                    phdr p_paddr !
+    4                           phdr p_align !
+    PF_X PF_R OR                phdr p_flags !
+;
+
+\ callback to create new elf section with debugging information
+\ ~ typedef int (*Dwarf_Callback_Func_c)(
+    \ ~ char*           /*name*/,
+    \ ~ int             /*size*/,
+    \ ~ Dwarf_Unsigned  /*type*/,
+    \ ~ Dwarf_Unsigned  /*flags*/,
+    \ ~ Dwarf_Unsigned  /*link*/,
+    \ ~ Dwarf_Unsigned  /*info*/,
+    \ ~ Dwarf_Unsigned* /*sect_name_index*/,
+    \ ~ void *          /*user_data*/,
+    \ ~ int*            /*error*/);
+\ cdecl
+:NONAME ( 12_cells -- 12_cells section_index )
+    \ must leave parameters on stack
+    HEX
+    DUP 4 S" .rel" COMPARE 0= IF 0 ( ." Skipping .rel" CR ) ELSE \ skip relocations
+        \ ." Created section: " DUP ASCIIZ> TYPE
+
+        new_section TO scn  \ ."  Address: " scn .
+        scn get_section_header TO shdr
+
+        shstrtab STH_LENGTH     shdr sh_name !
+        DUP ASCIIZ> shstrtab ADD_STRING
+        2 PICK                  shdr sh_type !
+        4 PICK                  shdr sh_flags !
+        0                       shdr sh_addr !
+        0                       shdr sh_offset !
+        OVER                    shdr sh_size !
+        6 PICK                  shdr sh_link !
+        8 PICK                  shdr sh_info !
+        1                       shdr sh_addralign !
+        0                       shdr sh_entsize !
+        (( scn )) elf_ndxscn \ return section index
+        \ DUP ." Section index: " . CR
+    THEN
+; 12 CELLS CALLBACK: dwarf_callback_func_c
+
+\ =============================== dwarf producer words =================================
+
+0 VALUE dw              \ dwarf producer
+0 VALUE dir_index       \ index of main source file directory
+0 VALUE bytes           \ temporary
+2VARIABLE error         \ dwarf producer error code
+0. error 2!
+2VARIABLE scn_index     \ temporary
+2VARIABLE scn_length    \ temporary
+0 VALUE bytes_written   \ temporary
+0 VALUE CU              \ main compilation unit
+
+: DWARF_ERROR ( f a u -- ) \ if true show string and error message using dwarf_errmsg
+    ROT IF
+        ." ERROR! " TYPE SPACE
+        (( error @ )) dwarf_errmsg ASCIIZ> TYPE SPACE BYE
+    ELSE 2DROP THEN
+;
+
+: ATTR_ERROR ( attr -- )    \ error creating attribute
+    DW_DLV_BADADDR DROP = S" New DIE or Attr Failed!" DWARF_ERROR
+;
+
+: dwarf_new_unsigned ( die attr value -- )  \ add unsigned attribute to DIE
+   >R >R >R (( dw R> R> R> 0 error )) dwarf_add_AT_unsigned_const ATTR_ERROR
+;
+
+: dwarf_new_signed ( die attr value -- )  \ add signed attribute to DIE
+   >R >R >R (( dw R> R> R> 0 error )) dwarf_add_AT_signed_const ATTR_ERROR
+;
+
+: dwarf_new_address ( die attr addr -- )   \ add address attribute to DIE
+   >R >R >R (( dw R> R> R> 0 0. error )) dwarf_add_AT_targ_address ATTR_ERROR
+;
+
+: dwarf_new_name ( die a u -- ) \ add name attribute to DIE; TODO: add last \0
+   >ASCIIZ 2 <( error )) dwarf_add_AT_name ATTR_ERROR
+;
+
+: dwarf_new_CU ( -- )   \ create compilation unit
+    (( dw DW_TAG_compile_unit 0   0 0 0 0 error )) dwarf_new_die DUP TO CU  ATTR_ERROR
+    CU DW_AT_low_pc LOADADDR dwarf_new_address \ low address
+    CU FNAME 2@ fullpath dwarf_new_name \ main file name
+    (( CU S" m3forth by OCo" error )) dwarf_add_AT_producer ATTR_ERROR
+    \ set this as root DIE
+    (( dw CU error )) dwarf_add_die_to_debug DW_DLV_NOCOUNT DROP = S" Add CU Failed!" DWARF_ERROR \ add DIE to info
+;
+
+0 VALUE last_sub_die \ TODO: temporary
+
+0 VALUE type_cell   \ DIE for type CELL
+0 VALUE type_unsigned_cell   \ DIE for type unsigned CELL
+0 VALUE type_double \ DIE for 2 CELLS
+
+: dwarf_new_type ( encoding size name_a name_u -- type ) \ create new type DIE with name
+    (( dw DW_TAG_base_type 0   CU 0 0 0 error )) dwarf_new_die DUP >R ATTR_ERROR
+    R@ -ROT dwarf_new_name
+    R@ DW_AT_byte_size ROT dwarf_new_unsigned
+    R@ DW_AT_encoding ROT dwarf_new_unsigned
+    R>
+;
+
+: dwarf_add_type ( die type -- )
+    2 <( dw -ROT DW_AT_type SWAP error )) dwarf_add_AT_reference ATTR_ERROR \ type is a reference
+;
+
+: create_types ( -- )   \ create base forth types
+    DW_ATE_signed CELL S" CELL" dwarf_new_type TO type_cell
+    DW_ATE_unsigned CELL S" UNSIGNED_CELL" dwarf_new_type TO type_unsigned_cell
+    DW_ATE_signed 2 CELLS S" DOUBLE" dwarf_new_type TO type_double
+;
+
+: dwarf_new_expression ( -- expr )
+    (( dw error )) dwarf_new_expr DUP 0= S" new expr. error " DWARF_ERROR
+;
+
+: dwarf_add_AT_location_expression ( die expr -- )
+    >R 1 <( dw SWAP DW_AT_location R> error )) dwarf_add_AT_location_expr ATTR_ERROR
+;
+
+: dwarf_new_location_address ( die addr -- ) \ add location address to DIE
+    dwarf_new_expression DUP >R
+    SWAP 2 <( 0 error )) dwarf_add_expr_addr DW_DLV_NOCOUNT DROP = S" new addr expr. error " DWARF_ERROR
+    R> dwarf_add_AT_location_expression
+;
+
+: dwarf_new_var_DIE ( -- die )
+    (( dw DW_TAG_variable 0   CU 0 0 0 error )) dwarf_new_die DUP ATTR_ERROR
+;
+
+: dwarf_new_const_DIE ( -- die )
+    (( dw DW_TAG_constant 0   CU 0 0 0 error )) dwarf_new_die DUP ATTR_ERROR
+;
+
+: dwarf_new_named_var ( addr u -- die )
+    dwarf_new_var_DIE DUP >R
+    -ROT 3 <( error )) dwarf_add_AT_name ATTR_ERROR
+    R>
+;
+
+: dwarf_new_named_const ( addr u -- die )
+    dwarf_new_const_DIE DUP >R
+    -ROT 3 <( error )) dwarf_add_AT_name ATTR_ERROR
+    R>
+;
+
+: dwarf_new_var ( file_index line addr type name_a name_u -- ) \ create variable
+\ type - one of basic forth types declared before
+    dwarf_new_named_var >R
+    R@ SWAP dwarf_add_type
+    R@ SWAP dwarf_new_location_address
+    R@ DW_AT_decl_line ROT dwarf_new_unsigned
+    R@ DW_AT_decl_file ROT dwarf_new_unsigned
+
+    R> DROP
+;
+
+: dwarf_new_const ( file_index line x type name_a name_u -- ) \ create constant
+\ type - one of basic forth types declared before
+    dwarf_new_named_const >R
+    R@ SWAP dwarf_add_type
+    R@ DW_AT_const_value ROT dwarf_new_signed
+    R@ DW_AT_decl_line ROT dwarf_new_unsigned
+    R@ DW_AT_decl_file ROT dwarf_new_unsigned
+
+    R> DROP
+;
+
+: dwarf_new_sub ( lo_addr hi_addr file_index line a u -- )  \ create subprogram DIE
+\ a u - name of subprogram
+    (( dw DW_TAG_subprogram 0   CU 0 0 0 error )) dwarf_new_die DUP >R ATTR_ERROR
+    R@ -ROT dwarf_new_name
+    R@ DW_AT_decl_line ROT dwarf_new_unsigned \ line declared
+    R@ DW_AT_decl_file ROT dwarf_new_unsigned \ file declared
+    R@ DW_AT_high_pc ROT dwarf_new_address
+    R@ DW_AT_low_pc ROT dwarf_new_address
+
+\    R> DROP
+    R> TO last_sub_die
+;
+
+: dwarf_new_file ( asciiz u -- index ) \ add file declaration without directory, get its index
+    DROP >R (( dw R> 0 0  0. 0. 0 )) dwarf_add_file_decl
+;
+
+: !get_file_index ( a u -- index ) \ get index of file in the table or create new file info and get its index
+    2DUP get_file_index ?DUP IF
+        -ROT 2DROP \ found
+    ELSE
+        2DUP dwarf_new_file     \ get new file index
+        DUP >R -ROT add_file R> \ store in file table
+    THEN
+;
+
+\ filename of last debugging symbol, counted string, count is CELL
+VARIABLE current_file_symbol 300 CHARS ALLOT
+0 current_file_symbol !
+
+: new_sub_in_file ( lo_addr hi_addr line a u a_file u_file -- ) \ create subprogram DIE and new function debugging symbol
+\ a u - symbol name
+\ a_file u_file - filename
+    2DUP current_file_symbol XCOUNT COMPARE 0<> IF \ new file differs
+        \ store to current_file_symbol
+        DUP current_file_symbol !
+        2DUP current_file_symbol CELL+ SWAP CMOVE
+        2DUP add_file_symbol \ create new file symbol
+    THEN
+    \ store args for add_function_symbol
+    2 PICK >R
+    3 PICK >R
+    6 PICK 6 PICK OVER - >R >R
+
+    !get_file_index SWAP >R -ROT R> dwarf_new_sub \ new dwarf subprogram
+    R> R> R> R> add_function_symbol \ new function symbol
+;
+
+0 \ subprogram data structure
+    CELL -- sd_address  \ start address
+    CELL -- sd_line     \ file line number
+    256 CHARS -- sd_name    \ name of subprogram (counted string)
+CONSTANT /sd
+
+CREATE LAST_SUB /sd ALLOT \ last subprogram data
+
+\ ========================= call frame info ===============================================
+
+0 VALUE cie \ current frame CIE
+
+CREATE init_bytes \ taken from c-code compiled elf
+  0x0C C, 0x0D C, 0 C, \ equals DW_CFA_def_cfa: r13 ofs 0
+HERE init_bytes - CONSTANT init_bytes_len
+
+: dwarf_add_frame_cie ( -- )
+    \ dbg augmenter code_align data_align ret_addr_reg init_bytes   init_bytes_len error
+    (( dw S" " DROP          2         -4           14 init_bytes init_bytes_len 0 error )) dwarf_add_frame_cie
+    DUP ATTR_ERROR TO cie
+;
+
+0 VALUE fde \ current FDE
+: dwarf_new_fde ( -- ) \ create new FDE
+    (( dw error )) dwarf_new_fde DUP ATTR_ERROR TO fde
+;
+
+: dwarf_add_frame_fde ( die addr len -- ) \ add current to list of FDEs
+    >R >R >R
+    \ dbg fde die    cie virt_addr code_len sym_idx error
+    (( dw fde R>   cie 0      R> 0     R> 0     0 0 error )) dwarf_add_frame_fde DROP
+;
+
+: dwarf_fde_cfa_offset ( reg offset -- ) \ append a DW_CFA_offset operation to the FDE
+    SWAP >R >R (( fde   R> S>D   R> 0 2SWAP   error )) dwarf_fde_cfa_offset DROP
+;
+
+: dwarf_add_fde_inst ( op val1 val2 -- ) \ add the operation specified by op to the FDE with parameters
+    >R >R >R
+    (( fde   R>   R> S>D   R> S>D  error )) dwarf_add_fde_inst DROP
+;
+
+: dwarf_add_frame_info_word ( -- ) \ add operations to FDE for hi-level words, first instruction is push {lr}
+    DW_CFA_advance_loc 1 0 dwarf_add_fde_inst \ skip 1st instruction, this operation must be first!!!
+    DW_CFA_def_cfa_offset 4 0 dwarf_add_fde_inst \ set default CFA offset
+    14 1 dwarf_fde_cfa_offset \ r14=lr is 4 bytes from CFA
+;
+
+: dwarf_add_frame_info ( -- ) \ add frame info for current subprogram
+    dwarf_new_fde \ create new FDE
+    last_sub_die   LAST_SUB sd_address @   CDATA-THERE OVER -
+    dwarf_add_frame_fde \ add it to the list
+    LAST_SUB sd_address @  TH@ 0xB500 = IF
+        \ hi-level word - add frame operations
+        dwarf_add_frame_info_word
+    THEN
+;
+
+: dwarf_init_fde ( -- ) \ initialize - create frame CIE
+    dwarf_add_frame_cie
+;
+
+[THEN] \ O_ELF
+
+EXPORT
+
+\ ========================= create new file with debugging info ============================
+
+O_ELF [IF]
+
+: DWARF_INIT ( load_addr addr a u -- ) \ create new file
+\ load_addr - load address
+\ addr - .text data address
+\ a u - filename
+    W/O CREATE-FILE THROW TO FD \ create given file
+    TO .TEXT \ store data address
+    TO LOADADDR
+    (( EV_CURRENT )) elf_version 0= S" libelf init failed!" ELF_ERROR
+    (( FD ELF_C_WRITE 0 )) elf_begin DUP TO E 0= S" libelf init failed!" ELF_ERROR \ init libelf
+
+    create_header       \ create elf header
+    create_phdr         \ create program header
+    create_section_text \ create .text section
+
+    \ init dwarf producer
+    (( DW_DLC_WRITE DW_DLC_SYMBOLIC_RELOCATIONS OR 0
+        ['] dwarf_callback_func_c \ function to create elf sections
+        0
+        0
+        0
+        0
+    )) dwarf_producer_init_c DUP TO dw
+    -1 = S" Dwarf producer init failed!" DWARF_ERROR
+
+    dwarf_new_CU    \ create main CU
+
+\    (( dw S" ." DROP 0 )) dwarf_add_directory_decl TO dir_index     \ add current directory
+    create_types \ create basic forth data types
+    dwarf_init_fde \ init call frame information
+;
+
+: CLEAR_SUB ( -- ) \ clear data of last stored subprogram
+    LAST_SUB sd_line 0!
+;
+
+( Dwarf_Unsigned dwarf_add_line_entry_b(Dwarf_P_Debug /*dbg*/,
+    Dwarf_Unsigned  /*file_index*/,
+    Dwarf_Addr      /*code_address*/,
+    Dwarf_Unsigned  /*lineno*/,
+    Dwarf_Signed    /*column_number*/,
+    Dwarf_Bool      /*is_source_stmt_begin*/,
+    Dwarf_Bool      /*is_basic_block_begin*/,
+    Dwarf_Bool      /*is_epilogue_begin*/,
+    Dwarf_Bool      /*is_prologue_end*/,
+    Dwarf_Unsigned  /*isa*/,
+    Dwarf_Unsigned  /*discriminator*/,
+    Dwarf_Error*    /*error*/;
+)
+: DWARF_LINE ( prologue -- ) \ store current line, file in debugging line info
+\ prologue must be 1 or 0
+    >R curfile !get_file_index >R
+    \     file   addr           line        col      stmt blk epilogue prologue isa                 discr error
+    (( dw R> 0   CDATA-THERE 0  CURSTR @ 0  >IN @ 0  1    0   0        R>       DW_ISA_ARM_thumb 0     0.     0 )) dwarf_add_line_entry_b
+    0<> S" Line add error" DWARF_ERROR
+;
+
+: DWARF_NEW_SUB ( a u -- )    \ store current subprogram data for later use
+    DUP LAST_SUB sd_name C!
+    LAST_SUB sd_name CHAR+ OVER >R SWAP CMOVE R> LAST_SUB sd_name + CHAR+ 0 SWAP C! \ store name with end zero
+    CDATA-THERE LAST_SUB sd_address !   \ address
+    CURSTR @   LAST_SUB sd_line !       \ line
+
+    (( dw  CDATA-THERE 0  0. 0 )) dwarf_lne_set_address 0<> S" Line add error" DWARF_ERROR \ begin line sequence
+;
+
+: DWARF_CREATE_SUB ( "name" -- ) \ create subprogram DIE with following name
+    \ doesn't affect input stream
+    SAVE-INPUT BL WORD COUNT DWARF_NEW_SUB RESTORE-INPUT THROW
+;
+
+: DWARF_END_SUB ( -- ) \ end subprogram declaration
+    \ end current line sequence
+    (( dw CDATA-THERE 0 error )) dwarf_lne_end_sequence 0<> S" Line end sequence error" DWARF_ERROR
+
+    LAST_SUB sd_line @ 0<> IF
+            LAST_SUB sd_address @
+            CDATA-THERE
+            LAST_SUB sd_line @
+            LAST_SUB sd_name COUNT
+            curfile
+        new_sub_in_file \ create new subprogram DIE and debugging symbol
+        dwarf_add_frame_info \ add frame info
+    THEN
+;
+
+: DWARF_NEW_VAR ( addr a u  -- ) \ add new var with a name
+    2>R >R
+    curfile !get_file_index   CURSTR @  R>   type_cell  2R>  dwarf_new_var
+;
+
+: DWARF_NEW_CONST ( x a u  -- ) \ add new constant with a name
+    2>R >R
+    curfile !get_file_index   CURSTR @  R>   type_cell  2R>  dwarf_new_const
+;
+
+: DWARF_CREATE_VAR ( addr "name" -- ) \ create variable DIE
+    \ doesn't affect input stream
+    >R SAVE-INPUT R> BL WORD COUNT DWARF_NEW_VAR RESTORE-INPUT THROW
+;
+
+: DWARF_CREATE_CONST ( x "name" -- ) \ create constant DIE
+    \ doesn't affect input stream
+    >R SAVE-INPUT R> BL WORD COUNT DWARF_NEW_CONST RESTORE-INPUT THROW
+;
+
+: DWARF_END ( size -- ) \ write elf file with debugging info
+    DUP TO FSIZE    text_data d_size ! \ fill .text section size
+
+    ehdrsz phdrsz + FSIZE + DUP phdr p_filesz ! \ fill some phdr fields
+                                phdr p_memsz !
+
+\    ( ehdrsz phdrsz + ) .TEXT 4 + @ ehdr e_entry ! \ entry point
+
+    (( dw 0 )) dwarf_transform_to_disk_form \ get number of sections to create
+    \ CR ." Forming sections:" CR
+    0 ?DO
+        \ get section index, length of section, pointer to buffer containing section data
+        (( dw I 0 scn_index scn_length )) dwarf_get_section_bytes TO bytes
+        \ ." Section: " scn_index @ .
+        (( E scn_index @ )) elf_getscn TO scn \ ." ( " scn . ." )" CR \ current section
+
+        scn new_data TO data    \ create section data
+
+        bytes               data d_buf !    \ data buffer
+        scn_length @        data d_size !
+        bytes_written 0     data d_off 2!
+\            bytes_written scn_length @ + TO bytes_written
+    LOOP
+    \ write debugging info
+    (( dw 0 )) dwarf_producer_finish DROP \ ." Finish result:"  U. CR
+
+    create_symtab create_strtab \ these sections must follow in this order !!!
+    create_shstrtab
+
+    (( E ELF_C_WRITE )) elf_update 0< S" update:" ELF_ERROR \ write elf file
+    (( E )) elf_end DROP \ close libelf
+    FD CLOSE-FILE THROW \ close file
+;
+
+[ELSE]
+
+: DWARF_INIT ( load_addr addr a u -- ) \ create new file
+    2DROP 2DROP
+;
+
+: CLEAR_SUB ( -- ) \ clear data of last stored subprogram
+;
+
+: DWARF_LINE ( prologue -- ) \ store current line, file in debugging line info
+    DROP
+;
+
+: DWARF_NEW_SUB ( a u -- )    \ store current subprogram data to later use
+    2DROP
+;
+
+: DWARF_CREATE_SUB ( "name" -- ) \ create subprogram DIE with following name
+;
+
+: DWARF_END_SUB ( -- ) \ end subprogram declaration
+;
+
+: DWARF_NEW_VAR ( addr a u  -- ) \ add new var with name
+    DROP 2DROP
+;
+
+: DWARF_CREATE_VAR ( addr "name" -- ) \ create variable DIE
+    \ doesn't affect input stream
+    DROP
+;
+
+: DWARF_END ( size -- ) \ write elf file with debugging info
+    DROP
+;
+
+[THEN]
+
+;MODULE
+

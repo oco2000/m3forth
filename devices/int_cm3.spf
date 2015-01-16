@@ -1,0 +1,17 @@
+\ Cortex-M3 common interrupts vector table.
+TARGET CDATA CURRENT-SECTION-START ORG
+
+RSTACK-BOTTOM , \ initial return stack pointer
+INTERRUPT RESET_IRQ     \ reset
+INTERRUPT NMI_IRQ       \ Non maskable interrupt
+INTERRUPT HARD_IRQ      \ HardFault Handler
+INTERRUPT MM_IRQ        \ Memory management
+INTERRUPT BF_IRQ        \ Memory access fault
+INTERRUPT UF_IRQ        \ Undefined instruction or illegal state
+0x10 ALLOT
+INTERRUPT SVC_IRQ       \ System service call via SWI instruction
+INTERRUPT DM_IRQ        \ Debug Monitor
+4 ALLOT
+INTERRUPT PSV_IRQ       \ Pendable request for system service
+INTERRUPT SYSTICK_IRQ   \ System tick timer
+

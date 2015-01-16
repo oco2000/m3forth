@@ -1,0 +1,224 @@
+\ partial semihosting support
+
+TARGET HEX
+
+0x02 EQU SYS_CLOSE
+0x10 EQU SYS_CLOCK
+0x30 EQU SYS_ELAPSED
+0x13 EQU SYS_ERRNO
+0x0C EQU SYS_FLEN
+0x15 EQU SYS_GET_CMDLINE
+0x16 EQU SYS_HEAPINFO
+0x08 EQU SYS_ISERROR
+0x09 EQU SYS_ISTTY
+0x01 EQU SYS_OPEN
+0x06 EQU SYS_READ
+0x07 EQU SYS_READC
+0x0E EQU SYS_REMOVE
+0x0A EQU SYS_SEEK
+0x12 EQU SYS_SYSTEM
+0x31 EQU SYS_TICKFREQ
+0x11 EQU SYS_TIME
+0x0D EQU SYS_TMPNAM
+0x05 EQU SYS_WRITE
+0x03 EQU SYS_WRITEC
+0x04 EQU SYS_WRITE0
+
+UDATA
+    CVARIABLE char                        \ temporary buffer for character
+    ALIGN 4 CELLS RESERVE   EQU params    \ params for syscalls, must be aligned !
+
+INTERPRETER
+
+: SCALL ( call -- ) \ compile syscall
+    [ASM]
+        r0 #mov
+        AB # bkpt
+\        nop
+    [END-ASM]
+;
+
+TARGET CDATA
+
+\ SYSCALLS
+
+\ ~ CODE WRITEC ( c -- ) \ write char to debug console
+    \ ~ char r1 #mov
+    \ ~ [ r1 ] tos strb
+    \ ~ popt
+    \ ~ SYS_WRITEC SCALL
+    \ ~ ret
+\ ~ END-CODE
+
+\ ~ : SEMIT1 ( c -- )
+    \ ~ WRITEC    1 >OUT +!
+\ ~ ;
+
+CODE SOPEN ( a mode len -- fd ) \ open a file
+    params r1 #mov
+    8 # r1 adds
+    [ 4 # r1 ]- tos str
+    popt
+    [ 4 # r1 ]- tos str
+    popt
+    [ r1 ] tos str
+    SYS_OPEN SCALL
+    r0 tos mov
+    ret
+END-CODE
+
+\ ~ CODE READC ( -- c ) \ read char from debug console
+    \ ~ 0 r1 #mov
+    \ ~ SYS_READC SCALL
+    \ ~ pusht
+    \ ~ r0 tos mov
+    \ ~ ret
+\ ~ END-CODE
+
+CODE SREAD1 ( fd -- c ) \ read one char from file fd
+    params r1 #mov
+    [ 4 # r1 ]+ tos str \ fd
+    char tmp2 #mov
+    [ 4 # r1 ]+ tmp2 str \ buffer
+    1 tmp3 #mov
+    [ r1 ] tmp3 str \ length
+    8 # r1 subs
+    SYS_READ SCALL
+    [ tmp2 ] tos ldrb
+    ret
+END-CODE
+
+CODE SWRITE ( fd a u -- ) \ write block to file
+    params r1 #mov
+    { tmp tmp2 tmp3 } pops
+    [ 4 # r1 ]+ tmp2 str \ fd
+    [ 4 # r1 ]+ tmp str \ buffer
+    [ r1 ] tos str \ length
+    8 # r1 subs
+    SYS_WRITE SCALL
+    tmp3 tos mov
+    ret
+END-CODE
+
+CODE SREAD ( fd a u1 -- u2 ) \ read block from file
+\ u2 = 0: success, u1 bytes read
+\ u2 = u1: EOF
+\ u2 < u1: u1-u2 bytes read
+    params r1 #mov
+    { tmp tmp2 } pops
+    [ 4 # r1 ]+ tmp2 str \ fd
+    [ 4 # r1 ]+ tmp str \ buffer
+    [ r1 ] tos str \ length
+    8 # r1 subs
+    SYS_READ SCALL
+    r0 tos mov
+    ret
+END-CODE
+
+\ ========================================
+TARGET CDATA
+    HERE CHAR : C, CHAR t C, CHAR t C,  0 C,   EQU console \ console file name for opening
+\ ~ HERE INTERPRETER
+\ ~ S" tester_short.f" SLITERAL,
+\ ~ TARGET EQU "tester"
+
+UDATA
+    VARIABLE write_fd                   \ file descriptor for output
+    VARIABLE read_fd                    \ file descriptor for input
+
+: SREAD' ( addr u1 -- u2 )
+\ read u1 chars into buffer addr
+\ u2 - chars read, 0 if EOF
+    DUP >R read_fd @ -ROT SREAD
+    ?DUP IF
+        DUP R@ = IF \ EOF
+            R> 2DROP 0
+        ELSE
+            R> SWAP -
+        THEN
+    ELSE R> THEN
+;
+
+0xFF EQU sbufsize
+UDATA sbufsize CHAR+ RESERVE   EQU sbuffer \ buffer for input data
+\ 1st byte is a counter
+sbuffer CHAR+ EQU schars
+IDATA CVARIABLE sbuffer-end \ number of bytes from the beginning to first CR
+0 sbuffer-end C!
+
+: STRCHR ( byte a u -- a1 | 0 ) \ find char in a string
+    BEGIN
+        DUP 0= 2OVER C@ = OR INVERT
+    WHILE
+        CHAR- SWAP CHAR+ SWAP
+    REPEAT
+    DROP DUP C@ ROT <> IF \ not found
+        DROP 0
+    THEN
+;
+
+: CR? ( a u -- a1 | 0 ) \ find CR in a string
+    0A -ROT STRCHR
+;
+
+: SEARCH-CR ( n -- ) \ find CR, write position into sbuffer-end
+    schars SWAP CR? DUP 0= ABORT" Line is too long"
+    sbuffer - sbuffer-end C!
+;
+
+: ?EOF ( chars_read -- )
+    0= sbuffer C@ 0= AND IF ." EOF" BEGIN AGAIN THEN
+;
+
+: READ-LINE ( -- )
+    sbuffer C@ 0= IF \ buffer is empty - read whole buffer
+        schars sbufsize SREAD' \ read into buffer
+        DUP ?EOF
+    ELSE \ buffer is not empty
+        sbuffer COUNT DUP >R +   sbufsize R@ -  SREAD' \ read remaining chars into buffer
+        DUP ?EOF
+        R> +
+    THEN
+    DUP sbuffer C! \ set buffer length
+    SEARCH-CR
+;
+
+: STRNCPY ( a1 u1 a2 u2 -- ) \ copy min(u1,u2) chars
+    ROT MIN CMOVE
+;
+
+: SHIFT-BUFFER ( -- ) \ shift the buffer left and correct its length
+    schars sbuffer-end C@ BOUNDS
+    sbuffer C@ sbuffer-end C@ - DUP sbuffer C! CMOVE
+;
+
+: SACCEPT ( a u -- u1 )
+    READ-LINE
+    2DUP schars sbuffer-end C@ 2DUP 1- TYPE 2SWAP STRNCPY \ move buffered line to dest. address and type it
+    NIP sbuffer-end C@ 1- ( throw out last CR ) MIN
+    SHIFT-BUFFER
+;
+
+: SKEY1 ( -- c )
+    read_fd @ SREAD1
+;
+
+: STYPE ( a u -- )
+    DUP >OUT +!
+    write_fd @ -ROT SWRITE ;
+
+' STYPE IS TYPE
+' (EMIT_WITH_TYPE) IS EMIT
+' SKEY1 IS KEY
+' SACCEPT IS ACCEPT
+
+: SINIT ( -- ) \ open console for output
+    console 4 ( write ) 3 ( length ) SOPEN write_fd !
+    console 0 ( read )  3 ( length ) SOPEN read_fd  !
+\    "tester" COUNT 0 ( read ) SWAP  ( 3 ) ( length ) SOPEN read_fd !
+    0 sbuffer C!
+;
+
+HOST
+
+TRUE CONSTANT SEMIHOSTING

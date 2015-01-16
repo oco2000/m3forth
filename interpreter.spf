@@ -1,0 +1,498 @@
+\ Interpreter
+
+TARGET DECIMAL
+
+: U.H   BASE @ HEX SWAP U. BASE ! ;
+
+\ words to execute or build words on target
+
+: ACCEPT1  ( c-addr u1 u2 -- c-addr u1 u3  flag )
+   KEY
+   DUP 13 =  OVER 10 = OR IF        \ RETURN
+      0<> EXIT
+   THEN
+   DUP 127 =  OVER 8 = OR IF    DROP    \ BACKSPACE/DEL
+      DUP IF
+     1-
+      8 DUP EMIT SPACE EMIT
+      THEN
+      FALSE EXIT
+   THEN
+   >R 2DUP > IF         \ NORMAL CHAR
+      ROT 2DUP +  R@ SWAP C!
+      -ROT
+      1+
+      R@ EMIT
+   THEN
+   R> DROP   FALSE ;
+
+: (ACCEPT)  ( c-addr u1 -- u2 )
+   0  BEGIN ACCEPT1 UNTIL  NIP NIP ;
+
+DEFER ACCEPT
+' (ACCEPT) IS ACCEPT
+
+: (DUMP)  ( c-addr u -- )
+   BASE @ >R HEX
+   OVER 8 U.R ." : "
+   BOUNDS 2DUP ?DO
+      I C@ 0 <# # # #> TYPE  SPACE
+   LOOP
+   SPACE
+   ?DO
+      I C@  DUP BL 128 WITHIN 0= IF DROP [CHAR] . THEN  EMIT
+   LOOP
+   R> BASE ! ;
+: DUMP  ( c-addr u -- )
+   BEGIN DUP 0< INVERT WHILE
+     2DUP 16 MIN CR (DUMP)
+     16 /STRING
+   REPEAT 2DROP ;
+: .S  ( N*X -- )
+    DEPTH ?DUP IF
+        DUP ." <" 0 .R ." > "
+        0 DO   DEPTH I 1+ - PICK .   LOOP
+    THEN
+;
+
+\ number input conversion
+: >DIGIT ( C, N1 -> N2, TF / FF )
+  SWAP
+  DUP 58 <
+      OVER 47 > AND
+      IF \ within 0..9
+         48 -
+      ELSE
+         DUP 64 >
+         IF
+           DUP 96 > IF 87 ELSE 55 THEN -
+         ELSE 2DROP 0 EXIT THEN
+      THEN
+   TUCK > DUP 0= IF NIP THEN
+;
+
+: >NUMBER  ( ud1 c-addr1 u1 -- ud2 c-addr2 u2 )
+  BEGIN
+    DUP
+  WHILE
+    >R
+    DUP >R
+    C@ BASE @ >DIGIT 0=     \ ud n flag
+    IF R> R> EXIT THEN     \ ud n  ( ud = udh udl )
+    SWAP BASE @ UM* DROP   \ udl n udh*base
+    ROT BASE @ UM* D+      \ (n udh*base)+(udl*baseD)
+    R> CHAR+ R> 1-
+  REPEAT
+;
+
+\ word headers and searching
+
+\ note: in remote-headers we use xt and cfa routines, although there is no
+\ code at all.  in that case the "code field" contains only the 2-byte xt of
+\ the actual code located in some other section
+
+HEX
+: CFA>LFA  4 - ;
+: LFA>CFA  4 + ;
+: NFA>LFA  ( c-addr -- xt )
+   COUNT 1F AND + HALIGNED ;
+: LFA>NFA  ( a-addr -- c-addr )  BEGIN  1- DUP C@ 80 AND UNTIL ;
+: CFA>NFA  ( a-addr -- c-addr )  CFA>LFA LFA>NFA ;
+: FIND  ( c-addr -- t-xt -1 | xt +1 | c-addr 0 )
+    LATEST @     \ latest must not have a remote header!
+    \ not a problem since initialized from host's 'link' variable?
+    BEGIN DUP WHILE ( c-addr cfa )
+        CFA>LFA DUP LFA>NFA 2>R ( c-addr )
+        R@ C@ 20 AND 0= IF \ not hidden
+            DUP COUNT  R@ COUNT 1F AND  COMPARE 0= IF
+                DROP  R@ NFA>LFA LFA>CFA
+                2R> NIP  C@ 40 AND 0= 1 OR  \ get immediate-flag
+                EXIT
+            THEN
+        THEN
+        2R> DROP @ \ get pointer to next header
+    REPEAT
+    DROP 0 ;
+
+\ code generation
+HEX
+: HSWAP ( n1 -- n2 ) \ swap halfwords
+    DUP FFFF AND 10 LSHIFT SWAP FFFF0000 AND 10 RSHIFT OR
+;
+: INSTR! ( instr addr -- ) SWAP HSWAP SWAP ! ; \ store instruction
+
+: imm16 ( opcode imm16 -- opcode ) \ encode imm16
+    DUP FF AND \ imm8
+    OVER F000 AND 4 LSHIFT OR \ imm4
+    OVER 0700 AND 4 LSHIFT OR \ imm3
+    SWAP 0800 AND F LSHIFT OR \ i
+    OR
+;
+: reg ( opcode reg -- opcode ) \ encode register
+    F AND 8 LSHIFT OR
+;
+: mov ( opcode reg imm16 -- opcode )
+    ROT SWAP imm16
+    SWAP reg
+;
+: movw ( reg imm16 addr -- )
+    >R F2400000 -ROT mov R> INSTR!
+;
+: movt ( reg imm16 addr -- )
+    >R F2C00000 -ROT mov R> INSTR!
+;
+: SPLIT ( n - lo hi )
+    DUP FFFF AND
+    SWAP 10 RSHIFT FFFF AND
+;
+: movreg  ( reg n addr -- bytes )
+    >R OVER SWAP SPLIT ( reg reg lo hi )
+    -ROT R@ movw ( reg hi )
+    ?DUP IF ( reg hi )
+        R@ CELL+ movt 8
+    ELSE DROP 4 THEN
+    RDROP
+;
+
+: movreg.unopt  ( reg n addr -- )
+    >R OVER SWAP SPLIT ( reg reg lo hi )
+    -ROT R@ movw ( reg hi )
+    R> CELL+ movt
+;
+
+: call! ( dst src -- bytes )
+    1+ \ thumb2 correction
+    SWAP DUP>R 0 -ROT movreg R> ( dst ) OVER +
+    4780 SWAP H! ( tmp blx ) 2+
+;
+
+: call.unopt! ( dst src -- )
+    1+ \ thumb2 correction
+    SWAP DUP>R 0 -ROT movreg.unopt R> ( dst )
+    CELL+ CELL+ 4780 SWAP H! ( tmp blx )
+;
+
+: CF!  ( a-addr -- )
+   LATEST @ 2+ ( skip push lr ) SWAP call.unopt! ;
+
+: COMPILE,  ( addr -- ) HERE SWAP call! ALLOT ;
+: LITERAL, ( n -- )
+    6D04F847 , ( pusht)
+    6 SWAP HERE movreg ALLOT
+;
+
+\ parser
+
+DECIMAL
+UDATA
+VARIABLE >IN
+80 EQU C/L
+C/L RESERVE EQU (TIB)
+VARIABLE #TIB
+0 VALUE TIB
+VARIABLE STATE
+0 VALUE SOURCE-ID
+
+: SOURCE  TIB #TIB @ ;
+
+: SOURCE! ( c-addr u -- )
+  #TIB ! TO TIB 0 >IN !
+;
+
+: (ABORT")  @SLIT ROT IF CR >IN @ SPACES [CHAR] ^ EMIT SPACE TYPE ABORT EXIT THEN  2DROP ;
+' (ABORT")  HOST TO '(ABORT")  TARGET
+
+: PARSE  ( char "xxx<char>" -- c-addr u )
+   >IN @ >R
+   BEGIN
+      SOURCE >IN @ /STRING   0= IF
+     2DROP  SOURCE R> /STRING EXIT
+      THEN
+      1 >IN +!
+      C@ OVER =
+   UNTIL
+   DROP  SOURCE DROP R@ +  >IN @ 1- R> - ;
+
+: PARSE-WORD  ( char "<chars>xxx<char"> -- c-addr u )
+   BEGIN
+      DUP
+      SOURCE >IN @ /STRING
+      -ROT  C@ = AND
+   WHILE  1 >IN +!  REPEAT
+   PARSE ;
+: WORD  ( char "<chars>xxx<char"> -- c-addr | 0 )
+    PARSE-WORD   DUP HERE C!  HERE -ROT  HERE 1+ SWAP MOVE ;
+: PARSE-NAME ( -- c-addr u )
+    BL PARSE-WORD ;
+
+: ?SLITERAL1 ( c-addr u -> ... )
+  0 0 2SWAP
+  OVER C@ [CHAR] - = DUP >R IF 1 - SWAP CHAR+ SWAP THEN
+  DUP 1 > IF
+    2DUP CHARS + CHAR- C@ [CHAR] . = DUP >R IF 1- THEN
+  ELSE 0 >R THEN
+  >NUMBER NIP ABORT" -?"
+  R> IF
+       R> IF DNEGATE THEN
+       STATE @ IF SWAP LITERAL, LITERAL, THEN
+  ELSE DROP
+       R> IF NEGATE THEN
+       STATE @ IF LITERAL, THEN
+  THEN
+;
+
+: ?STACK ( -> )
+  DEPTH 0< ABORT" Stack underflow"
+;
+
+: INTERPRET ( -- )
+   BEGIN
+      BL WORD DUP C@ 0<>
+   WHILE
+     FIND ?DUP IF
+        STATE @ = IF COMPILE, ELSE EXECUTE THEN
+     ELSE
+        COUNT ?SLITERAL1
+     THEN
+   REPEAT  DROP ;
+: REFILL
+   CR  TIB C/L ACCEPT  TIB SWAP SOURCE! ;
+: QUIT
+   BEGIN
+      REFILL
+      INTERPRET
+      ?STACK
+      STATE @ 0= IF .S ."  OK" THEN
+   AGAIN ;
+
+: SAVE-SOURCE ( -- i*x i )
+    SOURCE-ID   >IN @   SOURCE   4
+;
+
+: RESTORE-SOURCE ( i*x i  -- )
+    4 <> IF ABORT THEN
+    SOURCE!  >IN !  TO SOURCE-ID
+;
+
+: EVALUATE ( i*x c-addr u -- j*x )
+    SAVE-SOURCE N>R
+    SOURCE! -1 TO SOURCE-ID
+    INTERPRET
+    NR> RESTORE-SOURCE
+;
+
+CDATA
+: (ABORT)
+   !SP !RP  DECIMAL
+   0 STATE !  0 TO SOURCE-ID
+   (TIB) 0 SOURCE!
+   CR ." M3Forth (C) Oleg Voronin, David Kuehling 2013"
+   QUIT ;
+' (ABORT) IS ABORT
+
+: WORDS  ( -- )
+   CR 0 LATEST @
+   BEGIN DUP WHILE
+     CFA>LFA DUP LFA>NFA COUNT 31 AND
+     C/L >OUT @ - OVER <= IF CR THEN TYPE SPACE >OUT @ DUP 7 + 7 ANDC SWAP - SPACES
+     @ \ get pointer to next header
+     SWAP 1+ SWAP
+   REPEAT
+   DROP CR . ." words" CR ;
+
+\ defining words
+HEX
+
+COMPILER
+: COMPILE  ( "name" -- )
+   '  POSTPONE LITERAL   POSTPONE COMPILE, ;
+: [COMPILE]  ( "name" -- )
+   '  COMPILE, ;
+
+TARGET
+
+: POSTPONE ( "name" -- )
+  BL WORD FIND DUP
+  0= ABORT" -?"
+  1 = IF COMPILE,
+      ELSE LITERAL, ['] COMPILE, COMPILE, THEN
+; IMMEDIATE
+
+CODE (DOCON)
+    pusht
+    [ 1 # lr -] tos ldr
+    next,
+END-CODE
+
+CODE (DOVAR)
+    pusht
+    1 # lr tos sub
+    next,
+END-CODE
+
+: (CREATE)  ( "name" -- )
+    HALIGN
+    BL WORD  DUP C@ 1+ ALLOT
+    0A0 TOGGLE
+    BEGIN HERE 1 AND WHILE 0 C, REPEAT
+    LATEST DUP @ ,   HERE SWAP !
+    B500 H, ( lr push )
+    0 DUP DUP , , H, ; \ 10 bytes for code field ( 2*mov + blx )
+
+: REVEAL  ( -- )   LATEST @ CFA>NFA  020 TOGGLE ;
+: CONSTANT  ( x "name" -- )   (CREATE)  ['] (DOCON) CF!  ,  REVEAL ;
+: CREATE  ( "name" -- )   (CREATE)  ['] (DOVAR) CF!  REVEAL ;
+: VARIABLE  ( "name" -- )   CREATE CELL ALLOT ;
+\ todo: 'immediate' currently does not work with headless code.  on the other
+\ hand, we won't need a full kernel when doing headless code.  exclude via
+\ [IF]?
+: ] ( -- ) TRUE STATE ! ;
+: [ ( -- ) FALSE STATE ! ; IMMEDIATE
+: : ( -- ) (CREATE) -A ALLOT ] ;
+: ; ( -- ) BD00 H, ( pc pop ) [COMPILE] [ REVEAL ; IMMEDIATE
+: (DOES>)
+    R> 1- ( thumb2 correction ) CF! ;
+: DOES>
+    COMPILE (DOES>)
+    6D04F847 , ( pusht )
+    0601F1AE , ( 1 # lr tos sub )
+; IMMEDIATE
+: RECURSE
+    LATEST @ COMPILE, ; IMMEDIATE
+: IMMEDIATE
+    LATEST @ CFA>NFA 40 TOGGLE ;
+: >BODY ( cfa -- pfa )
+    0C + ;
+
+\ control flow
+
+500000 CONSTANT #FORWARD
+500001 CONSTANT #BACKWARD
+500002 CONSTANT #DO
+
+: ?LEN ( opcode -- branch_length ) D000 AND D000 = IF FF ELSE 7FF THEN ;
+: B_ENCODE ( offset opcode - opcode )
+    DUP ?LEN ROT AND  OR ;
+: B_ON    ( c-addr x -- )
+    OVER H@ ( addr x opcode )
+    B_ENCODE SWAP H! ;
+: OFFSET ( addr1 addr2 -- offset ) - 4 - 2/ ;
+: ?FAR  ( offset -- )   -100  0FF WITHIN INVERT ABORT" too far jump" ;
+: ?PAIRS  ( n1 n1 -- )  <> ABORT" unstructured" ;
+: MARK>  ( -- t-addr '#forward' )  HERE  #FORWARD ;
+: <MARK  ( -- t-addr '#backward' )  HERE #BACKWARD ;
+: RESOLVE>  ( t-addr '#forward' -- )
+    #FORWARD ?PAIRS HERE OVER OFFSET DUP ?FAR B_ON ;
+: <RESOLVE  ( t-addr '#backward' opcode -- )
+    >R  #BACKWARD ?PAIRS  HERE OFFSET DUP ?FAR R> B_ENCODE H, ;
+: TOS_TEST
+    4236 H, ( tst	tos, tos )
+    CF40 H, ( popt )
+;
+: IF
+    TOS_TEST MARK>
+    D000 H, ( beq xxx ) ; IMMEDIATE
+: AHEAD  MARK> E000 H, ( branch unconditional )  ; IMMEDIATE
+: THEN  RESOLVE> ; IMMEDIATE
+: ELSE  [COMPILE] AHEAD  2SWAP  [COMPILE] THEN ; IMMEDIATE
+: BEGIN  <MARK ; IMMEDIATE
+: UNTIL
+    TOS_TEST
+    D000 ( beq ) <RESOLVE ; IMMEDIATE
+: AGAIN  E000 ( branch unconditional ) <RESOLVE ; IMMEDIATE
+: WHILE  [COMPILE] IF ; IMMEDIATE
+: REPEAT  2SWAP [COMPILE] AGAIN  [COMPILE] THEN  ; IMMEDIATE
+
+: DO  COMPILE (DO)  FALSE <MARK #DO ; IMMEDIATE
+: ?DO  COMPILE (?DO) MARK> D000 H, TRUE <MARK #DO ; IMMEDIATE
+: LOOP
+   #DO ?PAIRS  COMPILE (LOOP) D700 ( bvc ) <RESOLVE  IF RESOLVE> THEN ; IMMEDIATE
+: +LOOP
+   #DO ?PAIRS  COMPILE (+LOOP) D700 ( bvc ) <RESOLVE  IF RESOLVE> THEN ; IMMEDIATE
+: UNLOOP    B002 H, ( add	sp, #8 ) ; IMMEDIATE
+: EXIT BD00 H, ; IMMEDIATE
+
+: SLITERAL,  ( c-addr u -- )
+   DUP C,
+   HERE OVER ALLOT  SWAP MOVE   HALIGN ;
+: (SLITERAL)  ( xt 'xxx"' -- )
+   COMPILE,  [CHAR] " PARSE SLITERAL, ;
+
+: LITERAL  LITERAL, ; IMMEDIATE
+: SLITERAL  STATE @ IF COMPILE (S")  SLITERAL, THEN ; IMMEDIATE
+: CHAR   BL WORD COUNT 0= ABORT" CHAR?" C@ ;
+: [CHAR]   CHAR  [COMPILE] LITERAL ; IMMEDIATE
+: '  ( "name" -- cfa )  BL WORD FIND 0= ABORT" unknown" ;
+: [']  '  [COMPILE] LITERAL ; IMMEDIATE
+: ."  ( -- )  ['] (.") (SLITERAL) ; IMMEDIATE
+: S"  ( -- )  [CHAR] " PARSE-WORD [COMPILE] SLITERAL ; IMMEDIATE
+: ABORT"  ( -- )  ['] (ABORT") (SLITERAL) ; IMMEDIATE
+: \
+    BEGIN  BL WORD C@ 0=  UNTIL ; IMMEDIATE
+: (
+    BEGIN
+        [CHAR] ) PARSE NIP DUP 0= IF  DROP REFILL DROP THEN
+    UNTIL ; IMMEDIATE
+: ) ;
+: .(
+  [CHAR] ) PARSE TYPE
+; IMMEDIATE
+
+TARGET DECIMAL
+
+: DROP DROP ;
+: DUP DUP ;
+: NIP NIP ;
+: 2DROP 2DROP ;
+: 2DUP 2DUP ;
+: OVER OVER ;
+: SWAP SWAP ;
+: PICK PICK ;
+
+: >R R> SWAP >R >R ;
+: DUP>R DUP R> SWAP >R >R ;
+: R> R> R> SWAP >R ;
+: R@ R> R@ SWAP >R ;
+
+: @ @ ;
+: C@ C@ ;
+: H@ H@ ;
+: AND AND ;
+: OR OR ;
+: XOR XOR ;
+: INVERT INVERT ;
+: LSHIFT LSHIFT ;
+: RSHIFT RSHIFT ;
+: 2* 2* ;
+: 2/ 2/ ;
+: CELLS CELLS ;
+: CHARS CHARS ;
+: + + ;
+: CHAR+ CHAR+ ;
+: CHAR- CHAR- ;
+: 1+ 1+ ;
+: 1- 1- ;
+: CELL+ CELL+ ;
+: - - ;
+: NEGATE NEGATE ;
+: ABS ABS ;
+: 0< 0< ;
+: S>D S>D ;
+: * * ;
+
+: DP DP ;
+: >IN >IN ;
+: LATEST LATEST ;
+: BASE BASE ;
+: STATE STATE ;
+
+: TRUE TRUE ;
+: FALSE FALSE ;
+: BL BL ;
+: CELL CELL ;
+
+: EMIT EMIT ;
+: TYPE TYPE ;
+: ACCEPT ACCEPT ;
+HOST
+

@@ -1,0 +1,640 @@
+\ выход при ошибке
+: ?HALT
+  ?DUP IF DUP ERROR2 HALT THEN ;
+
+' ?HALT TO ERROR
+
+S" lib/include/double.f" INCLUDED
+S" lib/include/core-ext.f" INCLUDED
+S" lib/include/case.f" INCLUDED
+S" lib/include/tools.f" INCLUDED
+
+: D<>
+    D= INVERT ;
+
+: 2, , , ;
+
+: 1s        ( x -- n )      \ определить количество единичных битов в байте
+  DUP 0x55 AND   SWAP 2/        0x55 AND   +
+  DUP 0x33 AND   SWAP 2/ 2/     0x33 AND   +
+  DUP 0x0F AND   SWAP 04 RSHIFT 0x0F AND   +
+;
+
+: !16le  ( x addr -- )
+   2DUP C!  SWAP 8 RSHIFT  SWAP CHAR+ C! ;
+: !32le  ( x addr -- )
+   4 0 ?DO  OVER 255 AND OVER I CHARS + C!  SWAP 8 RSHIFT  SWAP LOOP   2DROP ;
+: HSWAP  ( n1 -- n2 ) \ swap halfwords
+    DUP 0xFFFF AND 16 LSHIFT SWAP 0xFFFF0000 AND 16 RSHIFT OR
+;
+: DWARF_LINE  DROP ;
+
+
+CREATE TMEM 5000 ALLOT
+VARIABLE TDP
+TMEM TDP !
+
+: THERE  TDP @ ;
+: TALLOT TDP +! ;
+: T0ALLOT  THERE OVER ERASE TALLOT ;
+: TW@  W@ ;
+: T@  @ ;
+: T!  ! ;
+: INSTR! SWAP HSWAP SWAP T! ;
+: INSTR@ T@ HSWAP ;
+: TW!  W! ;
+: T,  THERE ! CELL TALLOT ;
+: TINSTRN,  THERE !16le  2 TALLOT ;
+: TINSTRW,  THERE INSTR! 4 TALLOT ;
+: TALIGNED ( a -- a' )    3 + 3 INVERT AND ;
+: TALIGNED? ( a -- f )    3 AND 0= ;
+: TALIGN    THERE TALIGNED TDP ! ;
+
+S" asm.spf" INCLUDED
+
+: B-SAVE ( a n FILENAME ) \ в формате binary
+  R/W CREATE-FILE THROW
+  DUP >R
+  WRITE-FILE THROW
+  R> CLOSE-FILE THROW
+;
+
+TALIGN
+THERE HEX
+ASM{
+            0x20002000   T, \ sp
+                   0x9   T, \ starting address+1 for thumb arch
+\             Rm Rn Rd
+  label START:
+    0x00320000 # r9 r10  adcs
+    0x00320000 # r9 r10  adc
+                 r7 r1   adcs
+      1F #lsr r2 r4 r9   adcs
+         #rrx r2 r4 r9   adcs
+      1F #lsr r2 r4 r9   adc
+         #rrx r2 r4 r9   adc
+
+    07  #        r2 r1   adds
+    07F #           r7   adds
+              r3 r1 r2   adds
+    0xFF #       r8 r9   adds
+    0x00FF00FF # r8 r9   adds
+    0xFF00FF00 # r8 r9   adds
+    0xAAAAAAAA # r8 r9   adds
+    0xFF000000 # r8 r9   adds
+    0x7F800000 # r8 r9   adds
+    0x3FC00000 # r8 r9   adds
+    0x1FE00000 # r8 r9   adds
+    0x000001FE # r7 r9   adds
+      1F #lsr r2 r4 r9   adds
+         #rrx r2 r4 r9   adds
+       8 #lsl r2 r4 r9   adds
+
+                 r8 r9   add
+       4 #       sp r1   add
+  7F 4 * #       sp sp   add
+    0x000001FE # r7 r9   add
+      1F #lsr r2 r4 r9   add
+              r3 r1 r2   add
+
+     FFF #       r9 r8   addw
+
+        THERE 8 + # r7   adr
+           START: # r7   adr
+        THERE 9 + # r7   adr
+
+    0x00320000 # r9 r10  ands
+    0x00320000 # r9 r10  and
+                 r7 r1   ands
+      20 #lsr r2 r4 r9   ands
+         #rrx r2 r4 r9   ands
+      1F #lsr r2 r4 r9   and
+         #rrx r2 r4 r9   and
+
+            20 # r2 r3   asrs
+                 r5 r7   asrs
+            20 # r2 r8   asrs
+             r12 r2 r8   asrs
+            20 # r2 r8   asr
+             r12 r2 r8   asr
+
+            1E # r2 r3   lsls
+                 r5 r7   lsls
+            1F # r8 r8   lsls
+             r12 r2 r8   lsls
+            1F # r2 r8   lsl
+             r12 r2 r8   lsl
+
+            1E # r2 r3   lsrs
+                 r5 r7   lsrs
+            20 # r8 r8   lsrs
+             r12 r2 r8   lsrs
+             1 # r2 r8   lsr
+             r12 r2 r8   lsr
+
+       5 # 2 #width r8   bfc
+    5 # 2 #width r8 r9   bfi
+
+    0x00320000 # r9 r10  bics
+    0x00320000 # r9 r10  bic
+                 r7 r1   bics
+      20 #lsr r2 r4 r9   bics
+         #rrx r2 r4 r9   bics
+      1F #lsr r2 r4 r9   bic
+         #rrx r2 r4 r9   bic
+
+                  20 #   bkpt
+
+              START: #   bl
+                   r14   blx
+                   r13   bx
+
+                         clrex
+                         nop.w
+                         yield.w
+                         wfe.w
+                         wfi.w
+                         sev.w
+                         nop
+                         yield
+                         wfe
+                         wfi
+                         sev
+
+        THERE 8 + # r7   cbz
+        THERE 4 + # r7   cbnz
+
+                 r8 r9   clz
+
+                 r6 r7   cmn
+           0xFF0 # r14   cmn
+         20 #lsr r4 r9   cmn
+
+             0xFF # r7   cmp
+           0xFF0 # r14   cmp
+                 r6 r7   cmp
+                 r6 r9   cmp
+         20 #lsr r4 r9   cmp
+
+                  0F #   dbg
+                  08 #   dmb
+                  07 #   dsb
+                  06 #   isb
+
+    0x00320000 # r9 r10  eors
+    0x00320000 # r9 r10  eor
+                 r7 r1   eors
+      1F #lsr r2 r4 r9   eors
+         #rrx r2 r4 r9   eors
+      1F #lsr r2 r4 r9   eor
+         #rrx r2 r4 r9   eor
+
+                    eq   it    nop
+                    ne   it    nop
+                    eq   itt   nop nop
+                    ne   itt   nop nop
+                    eq   ite   nop nop
+                    ne   ite   nop nop
+                    mi   ittt  nop nop nop
+                    pl   ittt  nop nop nop
+                    mi   itet  nop nop nop
+                    pl   itet  nop nop nop
+                    mi   itee  nop nop nop
+                    pl   itee  nop nop nop
+                    vs   itttt nop nop nop nop
+                    vc   itttt nop nop nop clrex
+                    vs   itett nop nop nop nop
+                    vc   itett nop nop nop clrex
+                    hi   ittet nop nop nop nop
+                    ls   ittet nop nop nop clrex
+                    ge   iteet nop nop nop nop
+                    lt   iteet nop nop nop clrex
+                    gt   ittte nop nop nop nop
+                    le   ittte nop nop nop clrex
+                    gt   itete nop nop nop nop
+                    le   itete nop nop nop clrex
+                    gt   ittee nop nop nop nop
+                    le   ittee nop nop nop clrex
+                    gt   iteee nop nop nop nop
+                    le   iteee nop nop nop clrex
+
+       { r3 r1 r7 } r3   ldm
+{ r1 r7 r8 r9 } r12 !!   ldmia
+{ r1 r7 r8 r9 } r12 !!   ldmdb
+
+                         \ ldr immediate
+        [ 20 # r6 ] r7   ldr \ T1
+             [ r6 ] r7   ldr \ T1
+       [ 104 # sp ] r7   ldr \ T2
+             [ sp ] r7   ldr \ T2
+       [ FFF # r8 ] r9   ldr \ T3
+             [ r8 ] r9   ldr \ T3
+       [ FF # r8 ]+ r9   ldr \ T4
+       [ FF # r8 ]- r9   ldr \ T4
+       [ FF # r8 +] r9   ldr \ T4
+       [ FF # r8 -] r9   ldr \ T4
+      [ FF # r8 +]! r9   ldr \ T4
+      [ FF # r8 -]! r9   ldr \ T4
+           [ r8 +]! r9   ldr \ T4
+                         \ ldr literal
+        THERE 8 + # r7   ldr \ T1
+      THERE 7FF + # r7   ldr \ T2
+           START: # r8   ldr \ T2
+                         \ ldr register
+          [ r1 r2 ] r7   ldr \ T1
+   [ 3 #lsl r8 r9 ] r7   ldr \ T2
+          [ r8 r9 ] r7   ldr \ T2
+
+                         \ ldrb immediate
+        [ 1F # r6 ] r7   ldrb
+             [ r6 ] r7   ldrb
+       [ 104 # sp ] r7   ldrb
+             [ sp ] r7   ldrb
+       [ FFF # r8 ] r9   ldrb
+             [ r8 ] r9   ldrb
+       [ FF # r8 ]+ r9   ldrb
+       [ FF # r8 ]- r9   ldrb
+       [ FF # r8 +] r9   ldrb
+       [ FF # r8 -] r9   ldrb
+      [ FF # r8 +]! r9   ldrb
+      [ FF # r8 -]! r9   ldrb
+           [ r8 +]! r9   ldrb
+                         \ ldrb literal
+        THERE 8 + # r7   ldrb
+      THERE 7FF + # r7   ldrb
+           START: # r8   ldrb
+                         \ ldrb register
+          [ r1 r2 ] r7   ldrb
+   [ 3 #lsl r8 r9 ] r7   ldrb
+          [ r8 r9 ] r7   ldrb
+
+        [ FF # r8 ] r9   ldrbt
+        [ FF # r8 ] r9   ldrht
+        [ FF # r8 ] r9   ldrsbt
+        [ FF # r8 ] r9   ldrsht
+        [ FF # r8 ] r9   ldrt
+
+nop   [ 3FC # r7 ]+ r8 r9   ldrd
+   [ 3FC # r7 ]- r8 r9   ldrd
+   [ 3FC # r7 +] r8 r9   ldrd
+   [ 3FC # r7 -] r8 r9   ldrd
+  [ 3FC # r7 +]! r8 r9   ldrd
+  [ 3FC # r7 -]! r8 r9   ldrd
+        [ r7 +]  r8 r9   ldrd
+
+label L2:
+    THERE 10 + # r8 r9   ldrd
+   THERE 400 + # r8 r9   ldrd
+           L2: # r8 r9   ldrd
+
+       [ 3FC # r8 ] r9   ldrex
+             [ r8 ] r9   ldrexb
+             [ r8 ] r9   ldrexh
+
+                         \ ldrh immediate
+        [ 3E # r6 ] r7   ldrh
+             [ r6 ] r7   ldrh
+       [ FFF # r8 ] r9   ldrh
+             [ r8 ] r9   ldrh
+       [ FF # r8 ]+ r9   ldrh
+       [ FF # r8 ]- r9   ldrh
+       [ FF # r8 +] r9   ldrh
+       [ FF # r8 -] r9   ldrh
+      [ FF # r8 +]! r9   ldrh
+      [ FF # r8 -]! r9   ldrh
+           [ r8 +]! r9   ldrh
+                         \ ldrh literal
+        THERE 8 + # r7   ldrh
+      THERE 7FF + # r7   ldrh
+           START: # r8   ldrh
+                         \ ldrh register
+          [ r1 r2 ] r7   ldrh
+   [ 3 #lsl r8 r9 ] r7   ldrh
+          [ r8 r9 ] r7   ldrh
+
+                         \ ldrsb immediate
+       [ FFF # r8 ] r9   ldrsb
+             [ r8 ] r9   ldrsb
+       [ FF # r8 ]+ r9   ldrsb
+       [ FF # r8 ]- r9   ldrsb
+       [ FF # r8 +] r9   ldrsb
+       [ FF # r8 -] r9   ldrsb
+      [ FF # r8 +]! r9   ldrsb
+      [ FF # r8 -]! r9   ldrsb
+           [ r8 +]! r9   ldrsb
+                         \ ldrsb literal
+        THERE 8 + # r7   ldrsb
+      THERE 7FF + # r7   ldrsb
+           START: # r8   ldrsb
+                         \ ldrsb register
+          [ r1 r2 ] r7   ldrsb
+   [ 3 #lsl r8 r9 ] r7   ldrsb
+          [ r8 r9 ] r7   ldrsb
+
+                         \ ldrsh immediate
+       [ FFF # r8 ] r9   ldrsh
+             [ r8 ] r9   ldrsh
+       [ FF # r8 ]+ r9   ldrsh
+       [ FF # r8 ]- r9   ldrsh
+       [ FF # r8 +] r9   ldrsh
+       [ FF # r8 -] r9   ldrsh
+      [ FF # r8 +]! r9   ldrsh
+      [ FF # r8 -]! r9   ldrsh
+           [ r8 +]! r9   ldrsh
+                         \ ldrsh literal
+        THERE 8 + # r7   ldrsh
+      THERE 7FF + # r7   ldrsh
+           START: # r8   ldrsh
+                         \ ldrsh register
+          [ r1 r2 ] r7   ldrsh
+   [ 3 #lsl r8 r9 ] r7   ldrsh
+          [ r8 r9 ] r7   ldrsh
+
+           r6 r7 r8 r9   mla
+           r6 r7 r8 r9   mls
+
+               FF # r7   movs
+       0x000001FE # r9   movs
+                 r6 r7   movs
+                 r8 r9   movs
+
+       0x000001FE # r9   mov
+                 r6 r7   mov
+                 r8 r9   mov
+
+           0x5555 # r9   movw
+           0xAAAA # r9   movt
+
+            CONTROL r9   mrs
+            r9 CONTROL   msr
+
+                 r6 r7   muls
+              r7 r8 r9   mul
+
+       0x000001FE # r9   mvns
+                 r6 r7   mvns
+         20 #lsr r4 r9   mvns
+       0x000001FE # r9   mvn
+         20 #lsr r4 r9   mvn
+                 r4 r9   mvn
+
+    0x000001FE # r8 r9   orns
+              r6 r7 r8   orns
+      20 #lsr r4 r8 r9   orns
+    0x000001FE # r8 r9   orn
+              r6 r7 r8   orn
+      20 #lsr r4 r8 r9   orn
+
+    0x00320000 # r9 r10  orrs
+    0x00320000 # r9 r10  orr
+                 r7 r1   orrs
+      1F #lsr r2 r4 r9   orrs
+         #rrx r2 r4 r9   orrs
+      1F #lsr r2 r4 r9   orr
+         #rrx r2 r4 r9   orr
+
+          [ FFF # r9 ]   pld
+          [ -FF # r9 ]   pld
+              START: #   pld
+          THERE 10 + #   pld
+      [ 3 #lsl r8 r9 ]   pld
+             [ r8 r9 ]   pld
+
+          [ FFF # r9 ]   pli
+          [ -FF # r9 ]   pli
+              START: #   pli
+          THERE 10 + #   pli
+      [ 3 #lsl r8 r9 ]   pli
+             [ r8 r9 ]   pli
+
+       { r2 r1 r7 pc }   pop
+          { r2 r1 r8 }   pop
+                  r9     pop
+
+       { r2 r1 r7 lr }   push
+          { r2 r1 r8 }   push
+                  r9     push
+
+                 r8 r9   rbit
+
+                 r6 r7   rev
+                 r8 r9   rev
+                 r6 r7   rev16
+                 r8 r9   rev16
+                 r6 r7   revsh
+                 r8 r9   revsh
+
+            1E # r2 r3   rors
+                 r5 r7   rors
+            1F # r7 r8   rors
+             r12 r2 r8   rors
+            1F # r2 r8   ror
+             r12 r2 r8   ror
+
+                 r2 r3   rrx
+                 r8 r9   rrxs
+
+    0x00320000 # r9 r10  rsbs
+    0x00320000 # r9 r10  rsb
+                 r7 r1   rsbs
+      1F #lsr r2 r4 r9   rsbs
+         #rrx r2 r4 r9   rsbs
+      1F #lsr r2 r4 r9   rsb
+         #rrx r2 r4 r9   rsb
+
+    0x00320000 # r9 r10  sbcs
+    0x00320000 # r9 r10  sbc
+                 r7 r1   sbcs
+      1F #lsr r2 r4 r9   sbcs
+         #rrx r2 r4 r9   sbcs
+      1F #lsr r2 r4 r9   sbc
+         #rrx r2 r4 r9   sbc
+
+  10 # 0F #width r8 r9   sbfx
+  10 # 0F #width r8 r9   ubfx
+
+              r7 r8 r9   sdiv
+              r7 r8 r9   udiv
+
+           r6 r7 r8 r9   smlal
+           r6 r7 r8 r9   smull
+           r6 r7 r8 r9   umlal
+           r6 r7 r8 r9   umull
+
+      5 #lsl r8 6 # r9   ssat
+    11 #asr r8 1F # r9   ssat
+             r8 6 # r9   usat
+    11 #asr r8 1F # r9   usat
+
+          { r1 r2 } r3   stm
+{ r1 r7 r8 r9 } r12      stmia
+{ r1 r7 r8 r9 } r12 !!   stmdb
+
+                         \ str immediate
+        [ 20 # r6 ] r7   str \ T1
+             [ r6 ] r7   str \ T1
+       [ 104 # sp ] r7   str \ T2
+             [ sp ] r7   str \ T2
+       [ FFF # r8 ] r9   str \ T3
+             [ r8 ] r9   str \ T3
+       [ FF # r8 ]+ r9   str \ T4
+       [ FF # r8 ]- r9   str \ T4
+       [ FF # r8 +] r9   str \ T4
+       [ FF # r8 -] r9   str \ T4
+      [ FF # r8 +]! r9   str \ T4
+      [ FF # r8 -]! r9   str \ T4
+           [ r8 +]! r9   str \ T4
+                         \ str register
+          [ r1 r2 ] r7   str \ T1
+   [ 3 #lsl r8 r9 ] r7   str \ T2
+          [ r8 r9 ] r7   str \ T2
+
+                         \ strb immediate
+        [ 1F # r6 ] r7   strb
+             [ r6 ] r7   strb
+       [ 104 # sp ] r7   strb
+             [ sp ] r7   strb
+       [ FFF # r8 ] r9   strb
+             [ r8 ] r9   strb
+       [ FF # r8 ]+ r9   strb
+       [ FF # r8 ]- r9   strb
+       [ FF # r8 +] r9   strb
+       [ FF # r8 -] r9   strb
+      [ FF # r8 +]! r9   strb
+      [ FF # r8 -]! r9   strb
+           [ r8 +]! r9   strb
+                         \ strb register
+          [ r1 r2 ] r7   strb
+   [ 3 #lsl r8 r9 ] r7   strb
+          [ r8 r9 ] r7   strb
+
+        [ FF # r8 ] r9   strbt
+        [ FF # r8 ] r9   strht
+        [ FF # r8 ] r9   strt
+
+nop [ 3FC # r7 ]+ r8 r9   strd
+   [ 3FC # r7 ]- r8 r9   strd
+   [ 3FC # r7 +] r8 r9   strd
+   [ 3FC # r7 -] r8 r9   strd
+  [ 3FC # r7 +]! r8 r9   strd
+  [ 3FC # r7 -]! r8 r9   strd
+        [ r7 +]  r8 r9   strd
+
+    [ 3FC # r7 ] r8 r9   strex
+          [ r7 ] r8 r9   strex
+          [ r7 ] r8 r9   strexb
+          [ r7 ] r8 r9   strexh
+
+                         \ strh immediate
+        [ 1F # r6 ] r7   strh
+             [ r6 ] r7   strh
+       [ 104 # sp ] r7   strh
+             [ sp ] r7   strh
+       [ FFF # r8 ] r9   strh
+             [ r8 ] r9   strh
+       [ FF # r8 ]+ r9   strh
+       [ FF # r8 ]- r9   strh
+       [ FF # r8 +] r9   strh
+       [ FF # r8 -] r9   strh
+      [ FF # r8 +]! r9   strh
+      [ FF # r8 -]! r9   strh
+           [ r8 +]! r9   strh
+                         \ strh register
+          [ r1 r2 ] r7   strh
+   [ 3 #lsl r8 r9 ] r7   strh
+          [ r8 r9 ] r7   strh
+
+    07  #        r2 r1   subs
+    07F #           r7   subs
+              r3 r1 r2   subs
+    0xAAAAAAAA # r8 r9   subs
+    0x1FE00000 # r8 r9   subs
+      1F #lsr r2 r4 r9   subs
+         #rrx r2 r4 r9   subs
+       8 #lsl r2 r4 r9   subs
+
+       4 #       sp r1   sub
+  7F 4 * #       sp sp   sub
+    0x000001FE # r7 r9   sub
+      1F #lsr r2 r4 r9   sub
+              r3 r1 r2   sub
+
+     FFF #       r9 r8   subw
+
+                  FF #   svc
+
+                 r6 r7   sxtb
+          0 #ror r8 r9   sxtb
+          8 #ror r8 r9   sxtb
+         10 #ror r8 r9   sxtb
+         18 #ror r8 r9   sxtb
+                 r6 r7   sxth
+          0 #ror r8 r9   sxth
+         18 #ror r8 r9   sxth
+                 r6 r7   uxtb
+          0 #ror r8 r9   uxtb
+         18 #ror r8 r9   uxtb
+                 r6 r7   uxth
+          0 #ror r8 r9   uxth
+         18 #ror r8 r9   uxth
+
+             0xFF # r7   tst
+           0xFF0 # r14   tst
+                 r6 r7   tst
+                 r6 r9   tst
+         20 #lsr r4 r9   tst
+
+             0xFF # r7   teq
+           0xFF0 # r14   teq
+                 r6 r9   teq
+         20 #lsr r4 r9   teq
+
+             [ r8 r9 ]   tbb
+      [ 1 #lsl r8 r9 ]   tbh
+
+
+\ control structures
+\ narrow
+    eq   if
+                 r1 r2   ands
+                 r1 r2   ands
+    else
+             1 # r2 r8   lsr
+    then
+                 r1 r2   ands
+
+    begin
+                 r1 r2   ands
+    eq until
+
+    begin
+                 r1 r2   ands
+    eq while
+                 r1 r2   ands
+    repeat
+\ wide
+    eq   if.w
+                 r1 r2   ands
+    else.w
+            1E # r2 r3   lsrs
+                 r5 r7   lsrs
+            20 # r8 r8   lsrs
+    then.w
+                 r1 r2   ands
+
+    begin
+                 r1 r2   ands
+                 100 T0ALLOT \ wide branch
+    eq until
+
+    begin
+                 r1 r2   ands
+    eq while.w
+                 r1 r2   ands
+    repeat.w
+
+}ASM
+
+ THERE OVER - S" testasm.bin" B-SAVE
+.S
+BYE

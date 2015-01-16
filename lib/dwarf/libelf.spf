@@ -1,0 +1,358 @@
+BASE @ DECIMAL
+
+USE libelf.so.1
+
+1 CONSTANT EV_CURRENT
+
+
+
+\ Constants for elf_begin
+0 enum
+  ELF_C_NULL
+  ELF_C_READ
+  ELF_C_RDWR
+  ELF_C_WRITE
+  ELF_C_CLR
+  ELF_C_SET
+  ELF_C_FDDONE
+  ELF_C_FDREAD
+  ELF_C_READ_MMAP
+  ELF_C_RDWR_MMAP
+  ELF_C_WRITE_MMAP
+  ELF_C_READ_MMAP_PRIVATE
+  ELF_C_EMPTY
+  ELF_C_NUM
+; DROP
+
+\ Identification values for recognized object files.
+0 enum
+  ELF_K_NONE
+  ELF_K_AR
+  ELF_K_COFF
+  ELF_K_ELF
+  ELF_K_NUM
+; DROP
+
+\ Known translation types.
+0 enum
+  ELF_T_BYTE
+  ELF_T_ADDR
+  ELF_T_DYN
+  ELF_T_EHDR
+  ELF_T_HALF
+  ELF_T_OFF
+  ELF_T_PHDR
+  ELF_T_RELA
+  ELF_T_REL
+  ELF_T_SHDR
+  ELF_T_SWORD
+  ELF_T_SYM
+  ELF_T_WORD
+  ELF_T_XWORD
+  ELF_T_SXWORD
+  ELF_T_VDEF
+  ELF_T_VDAUX
+  ELF_T_VNEED
+  ELF_T_VNAUX
+  ELF_T_NHDR
+  ELF_T_SYMINFO
+  ELF_T_MOVE
+  ELF_T_LIB
+  ELF_T_GNUHASH
+  ELF_T_AUXV
+  ELF_T_NUM
+; DROP
+
+0 \ ELF header
+  16 CHARS -- e_ident                \ Magic number and other info
+  2 CHARS -- e_type                 \ Object file type
+  2 CHARS -- e_machine              \ Architecture
+  CELL    -- e_version              \ Object file version
+  CELL    -- e_entry                \ Entry point virtual address
+  CELL    -- e_phoff                \ Program header table file offset
+  CELL    -- e_shoff                \ Section header table file offset
+  CELL    -- e_flags                \ Processor-specific flags
+  2 CHARS -- e_ehsize               \ ELF header size in bytes
+  2 CHARS -- e_phentsize            \ Program header table entry size
+  2 CHARS -- e_phnum                \ Program header table entry count
+  2 CHARS -- e_shentsize            \ Section header table entry size
+  2 CHARS -- e_shnum                \ Section header table entry count
+  2 CHARS -- e_shstrndx             \ Section header string table index
+DROP
+
+\ Descriptor for data to be converted to or from memory format.
+0
+  CELL -- d_buf                 \ Pointer to the actual data.
+  CELL -- d_type               \ Type of this piece of data.
+  CELL -- d_version             \ ELF version.
+  CELL -- d_size                \ Size in bytes.
+2 CELLS -- d_off                 \ Offset into section.
+  CELL -- d_align               \ Alignment in section.
+DROP
+
+\ section header
+0
+  CELL --     sh_name                \ Section name (string tbl index)
+  CELL --     sh_type                \ Section type
+  CELL --     sh_flags               \ Section flags
+  CELL --     sh_addr                \ Section virtual addr at execution
+  CELL --     sh_offset              \ Section file offset
+  CELL --     sh_size                \ Section size in bytes
+  CELL --     sh_link                \ Link to another section
+  CELL --     sh_info                \ Additional section information
+  CELL --     sh_addralign           \ Section alignment
+  CELL --     sh_entsize             \ Entry size if section holds table
+DROP
+
+\ Legal values for sh_type (section type).
+
+0           CONSTANT SHT_NULL            \ Section header table entry unused
+1           CONSTANT SHT_PROGBITS        \ Program data
+2           CONSTANT SHT_SYMTAB          \ Symbol table
+3           CONSTANT SHT_STRTAB          \ String table
+4           CONSTANT SHT_RELA            \ Relocation entries with addends
+5           CONSTANT SHT_HASH            \ Symbol hash table
+6           CONSTANT SHT_DYNAMIC         \ Dynamic linking information
+7           CONSTANT SHT_NOTE            \ Notes
+8           CONSTANT SHT_NOBITS          \ Program space with no data (bss)
+9           CONSTANT SHT_REL             \ Relocation entries, no addends
+10          CONSTANT SHT_SHLIB           \ Reserved
+11          CONSTANT SHT_DYNSYM          \ Dynamic linker symbol table
+14          CONSTANT SHT_INIT_ARRAY      \ Array of constructors
+15          CONSTANT SHT_FINI_ARRAY      \ Array of destructors
+16          CONSTANT SHT_PREINIT_ARRAY   \ Array of pre-constructors
+17          CONSTANT SHT_GROUP           \ Section group
+18          CONSTANT SHT_SYMTAB_SHNDX    \ Extended section indeces
+19          CONSTANT SHT_NUM             \ Number of defined types.
+0x60000000  CONSTANT SHT_LOOS            \ Start OS-specific.
+0x6FFFFFF5  CONSTANT SHT_GNU_ATTRIBUTES  \ Object attributes.
+0x6FFFFFF6  CONSTANT SHT_GNU_HASH        \ GNU-style hash table.
+0x6FFFFFF7  CONSTANT SHT_GNU_LIBLIST     \ Prelink library list
+0x6FFFFFF8  CONSTANT SHT_CHECKSUM        \ Checksum for DSO content.
+0x6FFFFFFA  CONSTANT SHT_LOSUNW          \ Sun-specific low bound.
+0x6FFFFFFA  CONSTANT SHT_SUNW_move
+0x6FFFFFFB  CONSTANT SHT_SUNW_COMDAT
+0x6FFFFFFC  CONSTANT SHT_SUNW_syminfo
+0x6FFFFFFD  CONSTANT SHT_GNU_verdef      \ Version definition section.
+0x6FFFFFFE  CONSTANT SHT_GNU_verneed     \ Version needs section.
+0x6FFFFFFF  CONSTANT SHT_GNU_versym      \ Version symbol table.
+0x6FFFFFFF  CONSTANT SHT_HISUNW          \ Sun-specific high bound.
+0x6FFFFFFF  CONSTANT SHT_HIOS            \ End OS-specific type
+0x70000000  CONSTANT SHT_LOPROC          \ Start of processor-specific
+0x7FFFFFFF  CONSTANT SHT_HIPROC          \ End of processor-specific
+0x80000000  CONSTANT SHT_LOUSER          \ Start of application-specific
+0x8FFFFFFF  CONSTANT SHT_HIUSER          \ End of application-specific
+
+\ Legal values for sh_flags (section flags).
+
+0 bit  CONSTANT SHF_WRITE             \ Writable
+1 bit  CONSTANT SHF_ALLOC             \ Occupies memory during execution
+2 bit  CONSTANT SHF_EXECINSTR         \ Executable
+4 bit  CONSTANT SHF_MERGE             \ Might be merged
+5 bit  CONSTANT SHF_STRINGS           \ Contains nul-terminated strings
+6 bit  CONSTANT SHF_INFO_LINK         \ `sh_info' contains SHT index
+7 bit  CONSTANT SHF_LINK_ORDER        \ Preserve order after combining
+8 bit  CONSTANT SHF_OS_NONCONFORMING  \ Non-standard OS specific handling required
+9 bit  CONSTANT SHF_GROUP             \ Section is member of a group.
+10 bit CONSTANT SHF_TLS               \ Section hold thread-local data.
+0x0FF00000 CONSTANT SHF_MASKOS            \ OS-specific.
+0xF0000000 CONSTANT SHF_MASKPROC          \ Processor-specific
+30 bit  CONSTANT SHF_ORDERED           \ Special ordering requirement (Solaris).
+31 bit CONSTANT SHF_EXCLUDE           \ Section is excluded unless referenced or allocated (Solaris).
+
+\ Program segment header.
+0
+  CELL --    p_type                 \ Segment type
+  CELL --    p_offset               \ Segment file offset
+  CELL --    p_vaddr                \ Segment virtual address
+  CELL --    p_paddr                \ Segment physical address
+  CELL --    p_filesz               \ Segment size in file
+  CELL --    p_memsz                \ Segment size in memory
+  CELL --    p_flags                \ Segment flags
+  CELL --    p_align                \ Segment alignment
+DROP
+
+\ Legal values for p_type (segment type).
+
+0          CONSTANT PT_NULL              \ Program header table entry unused
+1          CONSTANT PT_LOAD              \ Loadable program segment
+2          CONSTANT PT_DYNAMIC           \ Dynamic linking information
+3          CONSTANT PT_INTERP            \ Program interpreter
+4          CONSTANT PT_NOTE              \ Auxiliary information
+5          CONSTANT PT_SHLIB             \ Reserved
+6          CONSTANT PT_PHDR              \ Entry for header table itself
+7          CONSTANT PT_TLS               \ Thread-local storage segment
+8          CONSTANT PT_NUM               \ Number of defined types
+0x60000000 CONSTANT PT_LOOS              \ Start of OS-specific
+0x6474E550 CONSTANT PT_GNU_EH_FRAME      \ GCC .eh_frame_hdr segment
+0x6474E551 CONSTANT PT_GNU_STACK         \ Indicates stack executability
+0x6474E552 CONSTANT PT_GNU_RELRO         \ Read-only after relocation
+0x6FFFFFFA CONSTANT PT_LOSUNW
+0x6FFFFFFA CONSTANT PT_SUNWBSS           \ Sun Specific segment
+0x6FFFFFFB CONSTANT PT_SUNWSTACK         \ Stack segment
+0x6FFFFFFF CONSTANT PT_HISUNW
+0x6FFFFFFF CONSTANT PT_HIOS              \ End of OS-specific
+0x70000000 CONSTANT PT_LOPROC            \ Start of processor-specific
+0x7FFFFFFF CONSTANT PT_HIPROC            \ End of processor-specific
+
+\ Legal values for p_flags (segment flags).
+
+0 bit CONSTANT PF_X                      \ Segment is executable
+1 bit CONSTANT PF_W                      \ Segment is writable
+2 bit CONSTANT PF_R                      \ Segment is readable
+0x0FF00000 CONSTANT PF_MASKOS            \ OS-specific
+0xF0000000 CONSTANT PF_MASKPROC          \ Processor-specific
+
+\ Symbol table
+0
+    CELL -- st_name    \ Symbol name (string tbl index)
+    CELL -- st_value   \ Symbol value
+    CELL -- st_size    \ Symbol size
+ 1 CHARS -- st_info    \ Symbol type and binding
+ 1 CHARS -- st_other   \ Symbol visibility
+ 2 CHARS -- st_shndx   \ Section index
+DROP
+
+\ Legal values for ST_BIND subfield of st_info (symbol binding).
+
+0  CONSTANT STB_LOCAL       \ Local symbol
+1  CONSTANT STB_GLOBAL      \ Global symbol
+2  CONSTANT STB_WEAK        \ Weak symbol
+3  CONSTANT STB_NUM         \ Number of defined types.
+10 CONSTANT STB_LOOS        \ Start of OS-specific
+10 CONSTANT STB_GNU_UNIQUE  \ Unique symbol.
+12 CONSTANT STB_HIOS        \ End of OS-specific
+13 CONSTANT STB_LOPROC      \ Start of processor-specific
+15 CONSTANT STB_HIPROC      \ End of processor-specific
+
+\ Legal values for ST_TYPE subfield of st_info (symbol type).
+
+ 0 CONSTANT STT_NOTYPE         \ Symbol type is unspecified
+ 1 CONSTANT STT_OBJECT         \ Symbol is a data object
+ 2 CONSTANT STT_FUNC           \ Symbol is a code object
+ 3 CONSTANT STT_SECTION        \ Symbol associated with a section
+ 4 CONSTANT STT_FILE           \ Symbol's name is file name
+ 5 CONSTANT STT_COMMON         \ Symbol is a common data object
+ 6 CONSTANT STT_TLS            \ Symbol is thread-local data object
+ 7 CONSTANT STT_NUM         \ Number of defined types.
+10 CONSTANT STT_LOOS         \ Start of OS-specific
+10 CONSTANT STT_GNU_IFUNC      \ Symbol is indirect code object
+12 CONSTANT STT_HIOS        \ End of OS-specific
+13 CONSTANT STT_LOPROC      \ Start of processor-specific
+15 CONSTANT STT_HIPROC      \ End of processor-specific
+
+: ELF32_ST_INFO ( bind type -- info )
+    0xF AND   SWAP 4 LSHIFT  +
+;
+
+\ Special section indices.
+
+0      CONSTANT SHN_UNDEF       \ Undefined section
+0xFF00 CONSTANT SHN_LORESERVE       \ Start of reserved indices
+0xFF00 CONSTANT SHN_LOPROC          \ Start of processor-specific
+0xFF00 CONSTANT SHN_BEFORE          \ Order section before all others (Solaris).
+0xFF01 CONSTANT SHN_AFTER           \ Order section after all others (Solaris).
+0xFF1F CONSTANT SHN_HIPROC          \ End of processor-specific
+0xFF20 CONSTANT SHN_LOOS            \ Start of OS-specific
+0xFF3F CONSTANT SHN_HIOS            \ End of OS-specific
+0xFFF1 CONSTANT SHN_ABS             \ Associated symbol is absolute
+0xFFF2 CONSTANT SHN_COMMON          \ Associated symbol is common
+0xFFFF CONSTANT SHN_XINDEX          \ Index is in extra table.
+0xFFFF CONSTANT SHN_HIRESERVE       \ End of reserved indices
+
+
+4 CONSTANT EI_CLASS                      \ File class byte index
+0 CONSTANT ELFCLASSNONE                  \ Invalid class
+1 CONSTANT ELFCLASS32                    \ 32-bit objects
+2 CONSTANT ELFCLASS64                    \ 64-bit objects
+3 CONSTANT ELFCLASSNUM                   \
+
+5 CONSTANT EI_DATA                        \ Data encoding byte index
+0 CONSTANT ELFDATANONE                    \ Invalid data encoding
+1 CONSTANT ELFDATA2LSB                    \ 2's complement, little endian
+2 CONSTANT ELFDATA2MSB                    \ 2's complement, big endian
+3 CONSTANT ELFDATANUM                     \
+
+2 CONSTANT ET_EXEC
+
+\ ARM-specific constants
+
+40 CONSTANT EM_ARM
+
+0x70000003 CONSTANT SHT_ARM_ATTRIBUTES       \ Section holds attributes.
+
+\ Values for the Tag_CPU_arch EABI attribute.
+0 CONSTANT TAG_CPU_ARCH_PRE_V4
+1 CONSTANT TAG_CPU_ARCH_V4
+2 CONSTANT TAG_CPU_ARCH_V4T
+3 CONSTANT TAG_CPU_ARCH_V5T
+4 CONSTANT TAG_CPU_ARCH_V5TE
+5 CONSTANT TAG_CPU_ARCH_V5TEJ
+6 CONSTANT TAG_CPU_ARCH_V6
+7 CONSTANT TAG_CPU_ARCH_V6KZ
+8 CONSTANT TAG_CPU_ARCH_V6T2
+9 CONSTANT TAG_CPU_ARCH_V6K
+10 CONSTANT TAG_CPU_ARCH_V7
+11 CONSTANT TAG_CPU_ARCH_V6_M
+12 CONSTANT TAG_CPU_ARCH_V6S_M
+13 CONSTANT TAG_CPU_ARCH_V7E_M
+13 CONSTANT MAX_TAG_CPU_ARCH
+\ Pseudo-architecture to allow objects to be compatible with the subset of
+\   armv4t and armv6-m.  This value should never be stored in object files.
+MAX_TAG_CPU_ARCH 1+ CONSTANT TAG_CPU_ARCH_V4T_PLUS_V6_M
+
+\ EABI object attributes.
+
+4 enum
+  Tag_CPU_raw_name
+  Tag_CPU_name
+  Tag_CPU_arch
+  Tag_CPU_arch_profile
+  Tag_ARM_ISA_use
+  Tag_THUMB_ISA_use
+  Tag_FP_arch
+  Tag_WMMX_arch
+  Tag_Advanced_SIMD_arch
+  Tag_PCS_config
+  Tag_ABI_PCS_R9_use
+  Tag_ABI_PCS_RW_data
+  Tag_ABI_PCS_RO_data
+  Tag_ABI_PCS_GOT_use
+  Tag_ABI_PCS_wchar_t
+  Tag_ABI_FP_rounding
+  Tag_ABI_FP_denormal
+  Tag_ABI_FP_exceptions
+  Tag_ABI_FP_user_exceptions
+  Tag_ABI_FP_number_model
+  Tag_ABI_align_needed
+  Tag_ABI_align_preserved
+  Tag_ABI_enum_size
+  Tag_ABI_HardFP_use
+  Tag_ABI_VFP_args
+  Tag_ABI_WMMX_args
+  Tag_ABI_optimization_goals
+  Tag_ABI_FP_optimization_goals
+; DROP 33 enum
+  Tag_undefined33
+  Tag_CPU_unaligned_access
+  Tag_undefined35
+  Tag_FP_HP_extension
+  Tag_undefined37
+  Tag_ABI_FP_16bit_format
+  Tag_undefined39
+  Tag_undefined40
+  Tag_undefined41
+  Tag_MPextension_use
+  Tag_undefined_43
+  Tag_DIV_use
+; DROP 64 enum
+  Tag_nodefaults
+  Tag_also_compatible_with
+  Tag_T2EE_use
+  Tag_conformance
+  Tag_Virtualization_use
+  Tag_undefined69
+  Tag_MPextension_use_legacy
+; DROP
+
+BASE !

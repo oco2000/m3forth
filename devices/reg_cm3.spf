@@ -1,0 +1,50 @@
+\ Cortex-M3 common registers
+
+TARGET  HEX
+
+E0000000 EQU CM3_BASE
+E0000000 EQU ITM_BASE
+E000E000 EQU SCS_BASE
+E000E010 EQU SysTick_BASE
+E000E100 EQU NVIC_BASE
+E000ED00 EQU SCB_BASE
+E000EDF0 EQU CoreDebug_BASE
+
+\ SYSTEM TICK TIMER
+
+SCS_BASE
+010 REG: STCTRL                 \ System Timer Control and status register
+014 REG: STRELOAD               \ System Timer Reload value register
+018 REG: STCURR                 \ System Timer Current value register
+01C REG: STCALIB                \ System Timer Calibration value register
+DROP
+
+\ NESTED VECTORED INTERRUPT CONTROLLER (NVIC)
+
+NVIC_BASE
+000 REG: ISER                   \ Interrupt set enable
+080 REG: ICER                   \ Interrupt clear enable
+100 REG: ISPR                   \ Interrupt set pending
+180 REG: ICPR                   \ Interrupt clear pending
+200 REG: IABR                   \ Interrupt active bits
+300 REG: IPR                    \ Interrupt priorities
+DROP
+
+\ SYSTEM CONTROL BLOCK (SCB)
+
+SCB_BASE
+000 REG: CPUID                  \ CPU ID Base Register
+004 REG: ICSR                   \ Interrupt Control State Register
+008 REG: VTOR                   \ Vector Table Offset Register
+00C REG: AIRCR                  \ Application Interrupt / Reset Control Register
+010 REG: SCR                    \ System Control Register
+014 REG: CCR                    \ Configuration Control Register
+018 REG: SHPR1                  \ System Handlers Priority Registers (4-7, 8-11, 12-15)
+01C REG: SHPR2
+020 REG: SHPR3
+024 REG: SHCSR                  \ System Handler Control and State Register
+028 REG: CFSR                   \ Configurable Fault Status Register
+02C REG: HFSR                   \ Hard Fault Status Register
+034 REG: MMFAR                  \ Mem Manage Address Register
+038 REG: BFAR                   \ Bus Fault Address Register
+DROP

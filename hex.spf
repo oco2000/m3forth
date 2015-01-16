@@ -1,0 +1,36 @@
+\ intel hex generation
+
+HOST
+VARIABLE H-SUM
+
+: HEXBYTE ( byte file -- )
+  >R DUP H-SUM @ + H-SUM !
+  S>D <# # # #> R> WRITE-FILE THROW
+;
+
+: HEXLINE ( taddr file -- )
+  H-SUM 0!
+  >R S" :" R@ WRITE-FILE THROW
+  0x10 R@ HEXBYTE DUP 0x100 / R@ HEXBYTE
+  DUP 0xFF AND R@ HEXBYTE 0x00 R@ HEXBYTE
+  R>
+  0x10 0 DO
+    >R DUP TC@ R@ HEXBYTE
+    1+ R>
+  LOOP
+  >R DROP H-SUM @ NEGATE R@ HEXBYTE
+  0 0 R> WRITE-LINE THROW
+;
+
+: HEX-SAVE ( taddr count a u -- ) \ в формате intel.hex
+  BASE @ >R HEX
+  R/W CREATE-FILE THROW
+  -ROT
+  BOUNDS DO
+    I OVER HEXLINE
+  0x10 +LOOP
+  >R S" :00000001FF" R@ WRITE-LINE THROW
+  R> CLOSE-FILE THROW
+
+  R> BASE !
+;

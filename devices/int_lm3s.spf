@@ -1,0 +1,52 @@
+TARGET   HEX
+
+\ Interrupts
+
+INTERRUPT GPIOPortA_IRQ          \  GPIO Port A
+INTERRUPT GPIOPortB_IRQ          \  GPIO Port B
+INTERRUPT GPIOPortC_IRQ          \  GPIO Port C
+INTERRUPT GPIOPortD_IRQ          \  GPIO Port D
+INTERRUPT GPIOPortE_IRQ          \  GPIO Port E
+INTERRUPT UART0_IRQ              \  UART0
+INTERRUPT UART1_IRQ              \  UART1
+INTERRUPT SSI0_IRQ               \  SSI0
+INTERRUPT I2C0_IRQ               \  I2C0
+INTERRUPT PWMFault_IRQ           \  PWM Fault
+INTERRUPT PWMGen0_IRQ            \  PWM Generator 0
+INTERRUPT PWMGen1_IRQ            \  PWM Generator 1
+INTERRUPT PWMGen2_IRQ            \  PWM Generator 2
+INTERRUPT QEI0_IRQ               \  Quadrature Encoder 0
+INTERRUPT ADCSeq0_IRQ            \  ADC Sequence 0
+INTERRUPT ADCSeq1_IRQ            \  ADC Sequence 1
+INTERRUPT ADCSeq2_IRQ            \  ADC Sequence 2
+INTERRUPT ADCSeq3_IRQ            \  ADC Sequence 3
+INTERRUPT Watchdog_IRQ           \  Watchdog
+INTERRUPT Timer0A_IRQ            \  Timer 0A
+INTERRUPT Timer0B_IRQ            \  Timer 0B
+INTERRUPT Timer1A_IRQ            \  Timer 1A
+INTERRUPT Timer1B_IRQ            \  Timer 1B
+INTERRUPT Timer2A_IRQ            \  Timer 2A
+INTERRUPT Timer2B_IRQ            \  Timer 2B
+INTERRUPT Comp0_IRQ              \  Comp 0
+INTERRUPT Comp1_IRQ              \  Comp 1
+INTERRUPT Comp2_IRQ              \  Comp 2
+INTERRUPT SysCtrl_IRQ            \  System Control
+INTERRUPT FlashCtrl_IRQ          \  Flash Control
+INTERRUPT GPIOPortF_IRQ          \  GPIO Port F
+INTERRUPT GPIOPortG_IRQ          \  GPIO Port G
+INTERRUPT GPIOPortH_IRQ          \  GPIO Port H
+INTERRUPT USART2_IRQ             \  UART2 Rx and Tx
+INTERRUPT SSI1_IRQ               \  SSI1 Rx and Tx
+INTERRUPT Timer3A_IRQ            \  Timer 3 subtimer A
+INTERRUPT Timer3B_IRQ            \  Timer 3 subtimer B
+INTERRUPT I2C1_IRQ               \  I2C1 Master and Slave
+INTERRUPT QEI1_IRQ               \  Quadrature Encoder 1
+INTERRUPT CAN0_IRQ               \  CAN0
+INTERRUPT CAN1_IRQ               \  CAN1
+INTERRUPT CAN2_IRQ               \  CAN2
+INTERRUPT Ethernet_IRQ           \  Ethernet
+INTERRUPT Hibernate_IRQ          \  Hibernate
+INTERRUPT USB0_IRQ               \  USB0
+INTERRUPT PWMGen3_IRQ            \  PWM Generator 3
+INTERRUPT uDMA_IRQ               \  uDMA Software Transfer
+INTERRUPT uDMAErr_IRQ            \  uDMA Error
