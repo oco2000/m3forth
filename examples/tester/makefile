@@ -24,20 +24,21 @@ debug: $(project).spf.elf
 # run project with qemu and uart emulation
 run: $(project).spf.elf
 	killall qemu-system-arm ; sleep 1 && qemu-system-arm -M lm3s811evb -cpu cortex-m3 -nographic -monitor null -serial telnet:localhost:1235,server -kernel $(project).spf.elf &
-	sleep 2 && gnome-terminal -e "rlwrap nc localhost 1235" ; killall qemu-system-arm
+	sleep 2 ; rlwrap nc localhost 1235
+	killall qemu-system-arm
 
 # run project with qemu with semihosting
 run_semi: $(project).spf.elf
 	rlwrap qemu-system-arm -M lm3s811evb -cpu cortex-m3 -nographic -monitor null -serial null -semihosting -kernel $(project).spf.elf
 
 # run project with qemu, uart emulation and interpret tester.f,
-# short output format showing errors only
+# full output
 test: $(project).spf.elf
 	killall qemu-system-arm ; sleep 1 && qemu-system-arm -M lm3s811evb -cpu cortex-m3 -nographic -monitor null -serial telnet:localhost:1235,server -kernel $(project).spf.elf &
 	sleep 2 && nc localhost 1235 < tester.f ; killall qemu-system-arm
 
 # run project with qemu, uart emulation and interpret tester.f,
-# full output
+# short output format showing errors only
 test2: $(project).spf.elf
 	killall qemu-system-arm ; sleep 1 && qemu-system-arm -M lm3s811evb -cpu cortex-m3 -nographic -monitor null -serial telnet:localhost:1235,server -kernel $(project).spf.elf &
 	sleep 2 && nc localhost 1235 < tester.f | grep -ai 'incorrect\|wrong\|-?\|completed'; killall qemu-system-arm
