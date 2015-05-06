@@ -9,5 +9,8 @@ m3forth is a forth cross-compiler for cortex-m3 ARM microcontrollers
 * interpreter accessible via serial or USB (semihosting)
 * can be emulated in qEMU
 
+## Installation
+[See here](INSTALL.md)
+
 ## Documentation
-TODO
+[See here](DOCS.md)
