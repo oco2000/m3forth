@@ -23,7 +23,7 @@
     FALSE OPTION: O_MAP             -M      -m      \ display memory map
     FALSE OPTION: O_CONSTANTS       -C      -c      \ include constants (registers) into target image
     TRUE  OPTION: O_ELF             -E      -e      \ create elf file
-    FALSE OPTION: O_HEX             -HEX    -hex    \ create hex file
+    FALSE OPTION: O_HEX             -HEX    -hex   \ create hex file
     TRUE  OPTION: O_BITBANDING      -B      -b      \ use bit-banding when optimizing
 
 : +OPT  -O ;

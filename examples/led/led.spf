@@ -32,7 +32,7 @@ HOST DEVICE stm32vldiscovery = TARGET [IF]
 : LED_ON
     \ bit set
 \        GPIO_BSRR_BS8 GPIOC_BSRR ! \ set/reset register
-\        8 BIT GPIOC_BSRR !         \ set/reset regiter
+\        8 BIT GPIOC_BSRR !         \ set/reset register
 \        8 GPIOC_ODR BSET           \ bit-banding
     8 BIT GPIOC_ODR SET        \ read/mask/write
 ;
@@ -40,7 +40,7 @@ HOST DEVICE stm32vldiscovery = TARGET [IF]
 : LED_OFF
     \ bit clear
 \        GPIO_BSRR_BR8 GPIOC_BSRR ! \ set/reset register
-\        8 BIT GPIOC_BRR !          \ reset regiter
+\        8 BIT GPIOC_BRR !          \ reset register
 \        8 GPIOC_ODR BCLEAR         \ bit-banding
     8 BIT GPIOC_ODR CLEAR      \ read/mask/write
 ;
@@ -63,6 +63,8 @@ HOST DEVICE stm32vldiscovery = TARGET [IF]
 ;
 
 [ELSE]
+
+\ PROTEUS attempt
 
 HOST -b TARGET \ don't use bit-banding for proteus
 
@@ -116,6 +118,7 @@ GPIOA_PDR   EQU BUTTON_PULL
 
 [THEN]
 
+\ Common part
 
 HANDLER: SYSTICK
     LED_TOGGLE
@@ -129,4 +132,3 @@ HANDLER: SYSTICK
         CHECK_BUTTON
     AGAIN
 ;
-
