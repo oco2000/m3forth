@@ -2,7 +2,7 @@ REQUIRE 2CONSTANT lib/include/double.f
 
 BASE @ DECIMAL
 
-USE libdwarf.so
+USE libdwarf.so.1
 \ in ubuntu you need to build it from source:
 \   apt-get source libdwarf-dev
 \   ./configure --enable-shared --disable-nonshared

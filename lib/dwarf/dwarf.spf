@@ -275,7 +275,7 @@ CREATE temp_symbol /symbol ALLOT
 : DWARF_ERROR ( f a u -- ) \ if true show string and error message using dwarf_errmsg
     ROT IF
         ." ERROR! " TYPE SPACE
-        (( error @ )) dwarf_errmsg ASCIIZ> TYPE SPACE BYE
+        (( error @ )) dwarf_errmsg ASCIIZ> TYPE CR BYE
     ELSE 2DROP THEN
 ;
 
@@ -505,6 +505,7 @@ EXPORT
 \ ========================= create new file with debugging info ============================
 
 O_ELF [IF]
+VARIABLE _dw
 
 : DWARF_INIT ( load_addr addr a u -- ) \ create new file
 \ load_addr - load address
@@ -521,14 +522,20 @@ O_ELF [IF]
     create_section_text \ create .text section
 
     \ init dwarf producer
-    (( DW_DLC_WRITE DW_DLC_SYMBOLIC_RELOCATIONS OR 0
+    ((
+        DW_DLC_WRITE DW_DLC_SYMBOLIC_RELOCATIONS OR 0 \ DWORD
         ['] dwarf_callback_func_c \ function to create elf sections
-        0
-        0
-        0
-        0
-    )) dwarf_producer_init_c DUP TO dw
-    -1 = S" Dwarf producer init failed!" DWARF_ERROR
+        0 \ errhand
+        0 \ errarg
+        0 \ user_data
+        S" arm" >ASCIIZ \ *isa_name
+        S" V2" >ASCIIZ \ *dwarf_version
+        0 \ *extra
+        _dw \ dw
+        error \ error
+    )) dwarf_producer_init
+    DW_DLV_ERROR = S" Dwarf producer init failed!" DWARF_ERROR
+    _dw @ TO dw
 
     dwarf_new_CU    \ create main CU
 
