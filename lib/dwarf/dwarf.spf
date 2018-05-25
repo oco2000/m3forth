@@ -170,7 +170,7 @@ CREATE temp_symbol /symbol ALLOT
 
 : add_file_symbol ( a u -- ) \ add file name
     0 0 2SWAP
-    STB_LOCAL STT_FILE ELF32_ST_INFO
+    STB_GLOBAL STT_FILE ELF32_ST_INFO
     SHN_ABS
     add_symbol
 ;
@@ -275,7 +275,7 @@ CREATE temp_symbol /symbol ALLOT
 : DWARF_ERROR ( f a u -- ) \ if true show string and error message using dwarf_errmsg
     ROT IF
         ." ERROR! " TYPE SPACE
-        (( error @ )) dwarf_errmsg ASCIIZ> TYPE SPACE BYE
+        (( error @ )) dwarf_errmsg ASCIIZ> TYPE CR BYE
     ELSE 2DROP THEN
 ;
 
@@ -450,6 +450,22 @@ CREATE LAST_SUB /sd ALLOT \ last subprogram data
 
 CREATE init_bytes \ taken from c-code compiled elf
   0x0C C, 0x0D C, 0 C, \ equals DW_CFA_def_cfa: r13 ofs 0
+  0x07 C, 0x00 C, 0 C, \ equals DW_CFA_undefined: r0 undefined
+  0x07 C, 0x01 C, 0 C, \ equals DW_CFA_undefined: r1 undefined
+  0x07 C, 0x02 C, 0 C, \ equals DW_CFA_undefined: r2 undefined
+  0x07 C, 0x03 C, 0 C, \ equals DW_CFA_undefined: r3 undefined
+  0x07 C, 0x04 C, 0 C, \ equals DW_CFA_undefined: r4 undefined
+  0x07 C, 0x05 C, 0 C, \ equals DW_CFA_undefined: r5 undefined
+  0x07 C, 0x06 C, 0 C, \ equals DW_CFA_undefined: r6 undefined
+  0x07 C, 0x07 C, 0 C, \ equals DW_CFA_undefined: r7 undefined
+  0x07 C, 0x08 C, 0 C, \ equals DW_CFA_undefined: r8 undefined
+  0x07 C, 0x09 C, 0 C, \ equals DW_CFA_undefined: r9 undefined
+  0x07 C, 0x0A C, 0 C, \ equals DW_CFA_undefined: r10 undefined
+  0x07 C, 0x0B C, 0 C, \ equals DW_CFA_undefined: r11 undefined
+  0x07 C, 0x0C C, 0 C, \ equals DW_CFA_undefined: r12 undefined
+  0x0C C, 0x0D C, 0 C, \ equals DW_CFA_def_cfa: r13 ofs 0
+  \ r14 is specified in dwarf_add_frame_cie
+  \ r15 is pc, no need to specify init state
 HERE init_bytes - CONSTANT init_bytes_len
 
 : dwarf_add_frame_cie ( -- )
@@ -505,6 +521,7 @@ EXPORT
 \ ========================= create new file with debugging info ============================
 
 O_ELF [IF]
+VARIABLE _dw
 
 : DWARF_INIT ( load_addr addr a u -- ) \ create new file
 \ load_addr - load address
@@ -521,14 +538,20 @@ O_ELF [IF]
     create_section_text \ create .text section
 
     \ init dwarf producer
-    (( DW_DLC_WRITE DW_DLC_SYMBOLIC_RELOCATIONS OR 0
+    ((
+        DW_DLC_WRITE DW_DLC_SYMBOLIC_RELOCATIONS OR 0 \ DWORD
         ['] dwarf_callback_func_c \ function to create elf sections
-        0
-        0
-        0
-        0
-    )) dwarf_producer_init_c DUP TO dw
-    -1 = S" Dwarf producer init failed!" DWARF_ERROR
+        0 \ errhand
+        0 \ errarg
+        0 \ user_data
+        S" arm" >ASCIIZ \ *isa_name
+        S" V2" >ASCIIZ \ *dwarf_version
+        0 \ *extra
+        _dw \ dw
+        error \ error
+    )) dwarf_producer_init
+    DW_DLV_ERROR = S" Dwarf producer init failed!" DWARF_ERROR
+    _dw @ TO dw
 
     dwarf_new_CU    \ create main CU
 

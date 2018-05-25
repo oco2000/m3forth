@@ -11,8 +11,8 @@ st_path = ~/src/stlink
 $(project).spf.elf: *.spf
 	$(compiler) options.spf -H -I -O -d -M  S\" $(device)\" S\" $(project).spf\" m3forth.spf
 	arm-none-eabi-objdump -S -w $(project).spf.elf > $(project).spf.lst
-#	readelf -Ww $(project).spf.elf > $(project).spf.debug
-#	readelf -aW $(project).spf.elf > $(project).spf.info
+	readelf -Ww $(project).spf.elf > $(project).spf.debug
+	readelf -aW $(project).spf.elf > $(project).spf.info
 	chmod o+x $(project).spf.elf
 
 # debug project with qemu, uart emulation or semihosting and ddd
