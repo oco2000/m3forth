@@ -450,6 +450,22 @@ CREATE LAST_SUB /sd ALLOT \ last subprogram data
 
 CREATE init_bytes \ taken from c-code compiled elf
   0x0C C, 0x0D C, 0 C, \ equals DW_CFA_def_cfa: r13 ofs 0
+  0x07 C, 0x00 C, 0 C, \ equals DW_CFA_undefined: r0 undefined
+  0x07 C, 0x01 C, 0 C, \ equals DW_CFA_undefined: r1 undefined
+  0x07 C, 0x02 C, 0 C, \ equals DW_CFA_undefined: r2 undefined
+  0x07 C, 0x03 C, 0 C, \ equals DW_CFA_undefined: r3 undefined
+  0x07 C, 0x04 C, 0 C, \ equals DW_CFA_undefined: r4 undefined
+  0x07 C, 0x05 C, 0 C, \ equals DW_CFA_undefined: r5 undefined
+  0x07 C, 0x06 C, 0 C, \ equals DW_CFA_undefined: r6 undefined
+  0x07 C, 0x07 C, 0 C, \ equals DW_CFA_undefined: r7 undefined
+  0x07 C, 0x08 C, 0 C, \ equals DW_CFA_undefined: r8 undefined
+  0x07 C, 0x09 C, 0 C, \ equals DW_CFA_undefined: r9 undefined
+  0x07 C, 0x0A C, 0 C, \ equals DW_CFA_undefined: r10 undefined
+  0x07 C, 0x0B C, 0 C, \ equals DW_CFA_undefined: r11 undefined
+  0x07 C, 0x0C C, 0 C, \ equals DW_CFA_undefined: r12 undefined
+  0x0C C, 0x0D C, 0 C, \ equals DW_CFA_def_cfa: r13 ofs 0
+  \ r14 is specified in dwarf_add_frame_cie
+  \ r15 is pc, no need to specify init state
 HERE init_bytes - CONSTANT init_bytes_len
 
 : dwarf_add_frame_cie ( -- )
