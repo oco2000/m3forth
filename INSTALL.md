@@ -2,7 +2,7 @@
 
 ## ARM toolchain
 Get the ARM toolchain (this is GCC with utilities for ARM), e.g. [here](https://launchpad.net/gcc-arm-embedded). It's not needed if you don't want to debug your apps.
-Unpack it to any folder, e.g. ~/arm. Add this to **~/.bashrc**:
+Unpack it to any folder, e.g. \~/arm. Add this to **\~/.bashrc**:
 ```bash
 if [ -d "$HOME/arm/bin" ] ; then
     PATH="$HOME/arm/bin:$PATH"
