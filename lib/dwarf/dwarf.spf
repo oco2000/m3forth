@@ -170,7 +170,7 @@ CREATE temp_symbol /symbol ALLOT
 
 : add_file_symbol ( a u -- ) \ add file name
     0 0 2SWAP
-    STB_LOCAL STT_FILE ELF32_ST_INFO
+    STB_GLOBAL STT_FILE ELF32_ST_INFO
     SHN_ABS
     add_symbol
 ;
