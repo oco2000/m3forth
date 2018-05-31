@@ -14,6 +14,9 @@ S" lib/include/tools.f" INCLUDED
 
 : 2, , , ;
 
+: BIT  ( n -- mask )
+    1 SWAP LSHIFT ;
+
 : 1s        ( x -- n )      \ определить количество единичных битов в байте
   DUP 0x55 AND   SWAP 2/        0x55 AND   +
   DUP 0x33 AND   SWAP 2/ 2/     0x33 AND   +
