@@ -1,5 +1,5 @@
 
-compiler = ../../spf4
+compiler = ../../spf4 src/options.spf
 # project name
 project = tester
 # device used
@@ -9,7 +9,7 @@ st_path = ~/src/stlink
 
 # make project
 $(project).spf.elf: *.spf
-	$(compiler) options.spf -H -I -O -d -M  S\" $(device)\" S\" $(project).spf\" m3forth.spf
+	$(compiler) -H -I -O -d -M  S\" $(device)\" S\" $(project).spf\" m3forth.spf
 	arm-none-eabi-objdump -S -w $(project).spf.elf > $(project).spf.lst
 	readelf -Ww $(project).spf.elf > $(project).spf.debug
 	readelf -aW $(project).spf.elf > $(project).spf.info

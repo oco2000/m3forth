@@ -12,9 +12,9 @@ FNAME 2!
 2VARIABLE FDEVICE \ device file name
 FDEVICE 2!
 
-S" cross.spf" 			INCLUDED
+S" src/cross.spf" 			INCLUDED
 S" lib/include/place.f" INCLUDED
-S" hex.spf" INCLUDED
+S" src/hex.spf" INCLUDED
 CREATE FILENAME 255 ALLOT \ temp buffer
 
 \ ================= контроллер
@@ -30,13 +30,13 @@ FDEVICE 2@ INCLUDED \ include device file, start generating debug info
 HOST 'RAMBASE INTERPRETER EQU 'RAMBASE HOST
 
 \ compile asm primitives into cdata space
-S" prims.spf" INCLUDED
+S" src/prims.spf" INCLUDED
 \ now compile the higher-level code written as forth definitions
-S" kernel.spf" INCLUDED
+S" src/kernel.spf" INCLUDED
 
 O_INTERPRETER [IF]
     \ execute and build words on target
-    S" interpreter.spf" INCLUDED
+    S" src/interpreter.spf" INCLUDED
 
 [THEN]
 

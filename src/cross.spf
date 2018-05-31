@@ -555,8 +555,8 @@ INTERPRETER
 HOST
 VECT LITERAL,
 
-S" macros.spf" INCLUDED
-S" optimizer.spf" INCLUDED
+S" src/macros.spf" INCLUDED
+S" src/optimizer.spf" INCLUDED
 
 \ basic subroutine threaded code
 HOST HEX

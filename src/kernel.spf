@@ -343,7 +343,7 @@ COMPILER
     [END-ASM]
 ;
 
-S" opt_rules.spf" INCLUDED
+S" src/opt_rules.spf" INCLUDED
 
 COMPILER
 

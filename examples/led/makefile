@@ -1,5 +1,5 @@
 
-compiler = ../../spf4
+compiler = ../../spf4 src/options.spf
 # project name
 project = led
 # device used
@@ -10,7 +10,7 @@ st_path = ~/src/stlink
 .PHONY: proteus
 # make project
 $(project).spf.elf: *.spf
-	$(compiler) options.spf -h -i -O -D S\" $(device)\" S\" $(project).spf\" m3forth.spf
+	$(compiler) -h -i -O -D S\" $(device)\" S\" $(project).spf\" m3forth.spf
 	arm-none-eabi-objdump -S -w $(project).spf.elf > $(project).spf.lst
 	readelf -Ww $(project).spf.elf > $(project).spf.debug
 	readelf -aW $(project).spf.elf > $(project).spf.info
@@ -24,7 +24,7 @@ debug: $(project).spf.elf
 
 # make for proteus
 proteus: *.spf
-	$(compiler) options.spf -b -h -i -O -D S\" devices/proteus_device.spf\" S\" $(project).spf\" m3forth.spf
+	$(compiler) -b -h -i -O -D S\" devices/proteus_device.spf\" S\" $(project).spf\" m3forth.spf
 	arm-none-eabi-objdump -S -w $(project).spf.elf > $(project).spf.lst
 #	readelf -Ww $(project).spf.elf > $(project).spf.debug
 #	readelf -aW $(project).spf.elf > $(project).spf.info
