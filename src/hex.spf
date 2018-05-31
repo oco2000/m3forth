@@ -22,7 +22,7 @@ VARIABLE H-SUM
   0 0 R> WRITE-LINE THROW
 ;
 
-: HEX-SAVE ( taddr count a u -- ) \ в формате intel.hex
+: HEX-SAVE ( taddr count a u -- ) \ intel.hex
   BASE @ >R HEX
   R/W CREATE-FILE THROW
   -ROT

@@ -290,15 +290,6 @@ COMPILER
     [END-ASM]
 ;
 
-\ symmetric
-\ ~ : /
-    \ ~ [ASM]
-        \ ~ poptmp
-        \ ~ tos tmp tos sdiv
-    \ ~ [END-ASM]
-\ ~ ;
-
-
 : UNLOOP
     [ASM]
         8 # sp sp add

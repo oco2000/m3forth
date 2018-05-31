@@ -1,8 +1,8 @@
 \ m3forth
 DECIMAL
 
-C" 0.5" CONSTANT _VERSION
-.( m3forth by Oleg Voronin, David Kuehling. Version )
+C" 0.5.1" CONSTANT _VERSION
+.( m3forth by Oleg Voronin, David Kuehling 2013-2018. Version )
 _VERSION COUNT TYPE CR
 
 S" lib/include/double.f" INCLUDED
@@ -17,7 +17,7 @@ S" lib/include/place.f" INCLUDED
 S" src/hex.spf" INCLUDED
 CREATE FILENAME 255 ALLOT \ temp buffer
 
-\ ================= контроллер
+\ ================= device
 S" devices/devices.spf" INCLUDED \ device types
 FNAME 2@ FILENAME PLACE
 S" .elf" FILENAME +PLACE

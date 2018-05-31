@@ -286,7 +286,7 @@ CDATA
    !SP !RP  DECIMAL
    0 STATE !  0 TO SOURCE-ID
    (TIB) 0 SOURCE!
-   CR ." M3Forth (C) Oleg Voronin, David Kuehling 2013"
+   CR ." M3Forth (C) Oleg Voronin, David Kuehling 2013-2018"
    QUIT ;
 ' (ABORT) IS ABORT
 

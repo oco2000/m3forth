@@ -1082,16 +1082,5 @@ INTERPRETER
     SWAP 0 REG: +
 ;
 
-\ ~ COMPILER
-\ ~
-\ ~ : BITS{
-  \ ~ ( [ ) 0 TSTATE !H ;
-\ ~
-\ ~ INTERPRETER
-\ ~
-\ ~ : }BITS
-  \ ~ BIT [ ALSO COMPILING ] POSTPONE LITERAL POSTPONE ] ;
-\ ~
-
 HOST
 
