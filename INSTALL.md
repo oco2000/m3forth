@@ -31,10 +31,10 @@ sudo modprobe usb-storage
 Get **qEMU** for ARM to debug your programs without a real device. Install **qemu-system-arm** package using your package manager.
 
 ## libelf
-Get **libelf1** library for elf-files production. In most cases you should just install **libelf1** package
+Get **libelf1** library for elf-files production. In most cases you should just install **libelf1** package.
 
 ## libdwarf
-Get **libdwarf1** library for debug symbols generation. In most cases you should just install **libdwarf1** package
+Get **libdwarf1** library for debug symbols generation. In most cases you should just install **libdwarf1** package.  For 64-bit Linux install 32-bit package!
 
 ## ddd
 Get **ddd** (data display debugger). Install **ddd** package.
