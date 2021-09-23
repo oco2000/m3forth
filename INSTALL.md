@@ -1,31 +1,10 @@
 # INSTALLATION
 
-## ARM toolchain
-Get the ARM toolchain (this is GCC with utilities for ARM), e.g. [here](https://launchpad.net/gcc-arm-embedded). It's not needed if you don't want to debug your apps.
-Unpack it to any folder, e.g. \~/arm. Add this to **\~/.bashrc**:
-```bash
-if [ -d "$HOME/arm/bin" ] ; then
-    PATH="$HOME/arm/bin:$PATH"
-fi
-```
-Log off, and log in. The toolchain is enabled.
+## ARM binutils
+It contains utilities used in the project (arm-none-eabi-objdump). Install **binutils-arm-none-eabi** package.
 
-## ST-link
-Get the **st-link** to flash the controller. Download it [here](https://github.com/texane/stlink/), unpack, then compile it:
-```bash
-$ ./autogen.sh
-$ ./configure
-$ make
-```
-Make **/etc/modprobe.d/usb-storage** file:
-```bash
-options usb-storage quirks=483:3744:i
-```
-Reload **usb-storage** kernel module
-```bash
-sudo modprobe -r usb-storage
-sudo modprobe usb-storage
-```
+## ARM debugger
+It's not required if you don't want to debug your apps. Install **gdb-multiarch** package.
 
 ## qEMU
 Get **qEMU** for ARM to debug your programs without a real device. Install **qemu-system-arm** package using your package manager.
@@ -39,13 +18,24 @@ Get **libdwarf1** library for debug symbols generation. In most cases you should
 ## ddd
 Get **ddd** (data display debugger). Install **ddd** package.
 
+## rlwrap
+It is needed to make work with the forth terminal more convenient. Install **rlwrap** package.
+
+## xfce-terminal
+is used to communicate with the target. You can replace it with another terminal emulator, but different command line parameters should be used.
+
+## readelf
+To dump elf sections and content. Install **binutils** package.
+
+## netcat
+To connect to gdb server. Should be installed in most linux distros. If not - install **nc.openbsd** package.
+
+## ST-link
+Get the **stlink** to flash the controller. Install **stlink-tools** package.
+
 ## openocd
-Get **openocd** if you want to get USB connection to your device via semihosting and program in Forth on you device directly!. You can get it [here](http://sourceforge.net/projects/openocd). Unpack and compile:
-```bash
-./configure
-make
-sudo make install
-```
+Get **openocd** if you want to get USB connection to your device via semihosting and program in Forth on you device directly!. install **openocd** package.
+
 ## test
 To test your installation go to **examples/tester** and run:
 ```bash

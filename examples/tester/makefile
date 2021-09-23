@@ -19,7 +19,7 @@ $(project).spf.elf: *.spf
 debug: $(project).spf.elf
 	killall qemu-system-arm ; sleep 1 && qemu-system-arm -M lm3s811evb -cpu cortex-m3 -s -S -nographic -monitor null -serial telnet:localhost:1235,server -semihosting -kernel $(project).spf.elf &
 	sleep 1 && xfce4-terminal -x rlwrap nc localhost 1235 &
-	sleep 1 && ddd --eval-command="target remote localhost:1234" --debugger arm-none-eabi-gdb $(project).spf.elf ; killall qemu-system-arm
+	sleep 1 && ddd --eval-command="target remote localhost:1234" --debugger gdb-multiarch $(project).spf.elf ; killall qemu-system-arm
 
 # run project with qemu and uart emulation
 run: $(project).spf.elf
