@@ -5,7 +5,9 @@ project = led
 # device used
 device = devices/stm32vldiscovery.spf
 # where is st-link
-st_path = ~/src/stlink
+st_path = ~/src/stlink/build/Release/bin/
+openocd = openocd
+gdb = gdb-multiarch
 
 .PHONY: proteus
 # make project
@@ -20,7 +22,7 @@ $(project).spf.elf: *.spf
 debug: $(project).spf.elf
 	killall qemu-system-arm ; sleep 1 && qemu-system-arm -M lm3s811evb -cpu cortex-m3 -s -S -nographic -monitor null -serial telnet:localhost:1235,server -semihosting -kernel $(project).spf.elf &
 	sleep 1 && xfce4-terminal -x rlwrap nc localhost 1235 &
-	sleep 1 && ddd --eval-command="target remote localhost:1234" --debugger arm-none-eabi-gdb $(project).spf.elf ; killall qemu-system-arm
+	sleep 1 && ddd --eval-command="target remote localhost:1234" --debugger $(gdb) $(project).spf.elf ; killall qemu-system-arm
 
 # make for proteus
 proteus: *.spf
@@ -36,14 +38,14 @@ clean:
 
 # program project with st-link
 flash: $(project).spf.elf
-	sudo $(st_path)/st-flash write v1 $(project).spf.bin 0x8000000
+	sudo $(st_path)st-flash write $(project).spf.bin 0x8000000
 
 # debug project with st-link and ddd
 debug2: $(project).spf.elf
-	sudo $(st_path)/st-util &
-	sleep 1 && ddd --eval-command="target extended-remote localhost:4242" --debugger arm-none-eabi-gdb $(project).spf.elf ; sudo killall st-util
+	sudo $(st_path)st-util &
+	sleep 1 && ddd --eval-command="target extended-remote localhost:4242" --debugger $(gdb) $(project).spf.elf ; sudo killall st-util
 
 # debug project with openocd and ddd
 debug3: $(project).spf.elf
-	xfce4-terminal -e 'sudo rlwrap openocd -f stm32vldiscovery.cfg' &
-	sleep 10 && ddd --eval-command="target extended-remote localhost:4242" --debugger arm-none-eabi-gdb $(project).spf.elf
+	xfce4-terminal -e 'sudo rlwrap $(openocd) -f stm32vldiscovery.cfg' &
+	sleep 10 && ddd --eval-command="target extended-remote localhost:4242" --debugger $(gdb) $(project).spf.elf

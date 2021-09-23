@@ -1,13 +1,14 @@
 # This is an STM32VL discovery board with a single STM32F100RB chip.
 # http://www.st.com/internet/evalboard/product/250863.jsp
 
-add_script_search_dir /home/oleg/src/openocd-code/tcl/
-gdb_port 4242
+source [find interface/stlink.cfg]
 
-source [find interface/stlink-v1.cfg]
+transport select hla_swd
 
 set WORKAREASIZE 0x2000
-source [find target/stm32f1x_stlink.cfg]
+source [find target/stm32f1x.cfg]
+
+reset_config srst_only
 init
 arm semihosting enable
 reset run
