@@ -1,4 +1,4 @@
-\ выход при ошибке
+\ quit on error
 : ?HALT
   ?DUP IF DUP ERROR2 HALT THEN ;
 
@@ -17,7 +17,7 @@ S" lib/include/tools.f" INCLUDED
 : BIT  ( n -- mask )
     1 SWAP LSHIFT ;
 
-: 1s        ( x -- n )      \ определить количество единичных битов в байте
+: 1s        ( x -- n )      \ number of 1s in a byte
   DUP 0x55 AND   SWAP 2/        0x55 AND   +
   DUP 0x33 AND   SWAP 2/ 2/     0x33 AND   +
   DUP 0x0F AND   SWAP 04 RSHIFT 0x0F AND   +
@@ -55,7 +55,7 @@ TMEM TDP !
 
 S" asm.spf" INCLUDED
 
-: B-SAVE ( a n FILENAME ) \ в формате binary
+: B-SAVE ( a n FILENAME ) \ binary save
   R/W CREATE-FILE THROW
   DUP >R
   WRITE-FILE THROW
